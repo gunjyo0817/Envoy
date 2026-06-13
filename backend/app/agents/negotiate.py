@@ -8,7 +8,7 @@ from app.mock.seller import mock_seller_response
 def _gemini_opening_offer(listing: dict, budget: float) -> dict:
     """Returns {offer_price: float, message_text: str}"""
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     listing_price = listing.get("price_eur", budget)
     prompt = (
         f"You are a buyer's agent negotiating in German. "
@@ -23,7 +23,7 @@ def _gemini_opening_offer(listing: dict, budget: float) -> dict:
 def _gemini_counter_response(thread: list, budget: float, seller_price: float) -> dict:
     """Returns {offer_price: float, message_text: str, recommendation: str}"""
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     history = "\n".join([f"{m['role']}: {m['text']}" for m in thread[-4:]])
     prompt = (
         f"Seller countered at €{seller_price}. Budget: €{budget}. "
@@ -45,7 +45,7 @@ def negotiate_node(state: ProcurementState) -> dict:
         return {"status": "failed", "degraded": degraded}
 
     listing = candidates[idx]
-    listing_price = listing.get("price_eur", state["budget"])
+    listing_price = listing.get("price_eur") or state["budget"]
     thread = list(state.get("negotiation_thread", []))
     ts = lambda: datetime.datetime.now(datetime.timezone.utc).isoformat()
 
