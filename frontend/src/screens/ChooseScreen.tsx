@@ -27,6 +27,11 @@ export default function ChooseScreen({ state, onFeedback }: Props) {
   const top = candidates[0]
   const rest = candidates.slice(1, 3)
 
+  // Cards are directly clickable: the non-cancel checkpoint options map to the
+  // ranked candidates in order (option 0 → top pick, option 1 → runner-up #2…).
+  const pickOptions = (decision?.options ?? []).filter((o) => o.id !== 'cancel')
+  const choiceForRank = (rank: number): string | undefined => pickOptions[rank]?.id
+
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[var(--color-bg)] px-5 py-10 sm:px-6">
       <div
@@ -53,14 +58,25 @@ export default function ChooseScreen({ state, onFeedback }: Props) {
 
           {top && (
             <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start lg:gap-6">
-              <ListingCard candidate={top} rank={0} />
+              <ListingCard
+                candidate={top}
+                rank={0}
+                onClick={choiceForRank(0) ? () => handleChoice(choiceForRank(0)!) : undefined}
+                disabled={loading}
+              />
               {rest.length > 0 && (
                 <div className="space-y-3">
                   <p className="px-1 pt-1 text-xs font-medium text-[var(--color-ink-faint)] lg:pt-0">
-                    Runners-up
+                    Runners-up · tap to pick
                   </p>
                   {rest.map((c, i) => (
-                    <ListingCard key={i} candidate={c} rank={i + 1} />
+                    <ListingCard
+                      key={i}
+                      candidate={c}
+                      rank={i + 1}
+                      onClick={choiceForRank(i + 1) ? () => handleChoice(choiceForRank(i + 1)!) : undefined}
+                      disabled={loading}
+                    />
                   ))}
                 </div>
               )}

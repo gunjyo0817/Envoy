@@ -4,7 +4,31 @@ interface Props {
   candidate: Candidate
   rank: number
   variant?: 'full' | 'compact'
+  onClick?: () => void
+  selected?: boolean
+  disabled?: boolean
 }
+
+// Shared interactive affordance applied when a card is clickable.
+function interactiveProps(onClick?: () => void, disabled?: boolean) {
+  if (!onClick) return {}
+  return {
+    role: 'button' as const,
+    tabIndex: disabled ? -1 : 0,
+    'aria-disabled': disabled || undefined,
+    onClick: disabled ? undefined : onClick,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (disabled) return
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        onClick()
+      }
+    },
+  }
+}
+
+const CLICKABLE =
+  'cursor-pointer transition hover:border-[var(--color-primary)] hover:-translate-y-0.5 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]'
 
 const CONDITION_LABEL: Record<string, string> = {
   new: 'New',
@@ -37,14 +61,20 @@ function PinIcon() {
   )
 }
 
-export default function ListingCard({ candidate, rank, variant }: Props) {
+export default function ListingCard({ candidate, rank, variant, onClick, selected, disabled }: Props) {
   const v = variant ?? (rank === 0 ? 'full' : 'compact')
   const condition = CONDITION_LABEL[candidate.condition] ?? candidate.condition
   const platform = PLATFORM_LABEL[candidate.platform] ?? candidate.platform
+  const clickable = !!onClick
+  const ring = selected ? ' ring-2 ring-[var(--color-primary)]' : ''
+  const interactive = clickable ? ` ${CLICKABLE}${ring}` : ''
 
   if (v === 'compact') {
     return (
-      <article className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3">
+      <article
+        {...interactiveProps(onClick, disabled)}
+        className={`flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3${clickable ? ` ${CLICKABLE}${ring} hover:bg-[var(--color-surface-raised)]` : ''}`}
+      >
         <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--color-surface-raised)] text-xs font-semibold text-[var(--color-ink-muted)]">
           {rank + 1}
         </span>
@@ -62,7 +92,10 @@ export default function ListingCard({ candidate, rank, variant }: Props) {
   }
 
   return (
-    <article className="rounded-2xl border border-[var(--color-primary-dim)] bg-[var(--color-surface)] p-5">
+    <article
+      {...interactiveProps(onClick, disabled)}
+      className={`rounded-2xl border border-[var(--color-primary-dim)] bg-[var(--color-surface)] p-5${interactive}`}
+    >
       <div className="flex items-center justify-between gap-3">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary)] px-2.5 py-1 text-xs font-semibold text-[var(--color-primary-text)]">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
