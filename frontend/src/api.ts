@@ -69,6 +69,19 @@ export async function calendarAuthUrl(): Promise<string> {
   return (await r.json()).url
 }
 
+export async function addCalendarEvent(input: {
+  summary: string; location: string; start_iso: string; end_iso: string
+}): Promise<{ htmlLink: string }> {
+  const r = await fetch(`${BASE}/calendar/event`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(input),
+  })
+  if (r.status === 409) throw new Error('not_connected')
+  if (!r.ok) throw new Error('Failed to add to calendar')
+  return r.json()
+}
+
 export interface SessionState {
   query?: string
   budget?: number

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { SessionState } from '../api'
+import AddToCalendar from '../components/AddToCalendar'
 
 export default function DoneScreen({ state }: { state: SessionState }) {
   const p = state.meetup_proposal
@@ -142,6 +143,12 @@ export default function DoneScreen({ state }: { state: SessionState }) {
             )}
           </button>
         </div>
+
+        {(p?.location || chosen?.title) && (
+          <div className="mt-4">
+            <AddToCalendar summary={chosen?.title ? `Pick up ${chosen.title}` : 'Envoy meetup'} location={p?.location ?? ''} />
+          </div>
+        )}
       </div>
     </main>
   )
