@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listDeals, getDeal, type Deal } from '../api'
 import NegotiationThread from '../components/NegotiationThread'
+import AddToCalendar from '../components/AddToCalendar'
 
 function StatusChip({ status }: { status: string }) {
   const done = status === 'done'
@@ -74,6 +75,14 @@ export default function HistoryScreen() {
               Meetup: {m.location}
               {m.time_suggestion ? ` · ${m.time_suggestion}` : ''}
             </p>
+          )}
+          {(selected.meetup as { location?: string }).location && (
+            <div className="mt-4">
+              <AddToCalendar
+                summary={`Pick up ${selected.query ?? 'item'}`}
+                location={(selected.meetup as { location?: string }).location ?? ''}
+              />
+            </div>
           )}
           <h2 className="mt-8 mb-3 text-sm font-medium text-[var(--color-ink-faint)]">Negotiation</h2>
           {selected.negotiation_thread.length ? (

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSettings, updateSettings } from '../api'
+import { getSettings, updateSettings, calendarStatus, calendarAuthUrl } from '../api'
 import { useI18n } from '../i18n/I18nProvider'
 import { useAuth } from '../auth/AuthProvider'
 import { LANGS, type Lang } from '../i18n/strings'
@@ -16,6 +16,7 @@ export default function SettingsScreen() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [calConnected, setCalConnected] = useState<boolean | null>(null)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // No session (logged out, or token invalidated by a backend restart) →
@@ -48,10 +49,19 @@ export default function SettingsScreen() {
   }, [user, logout, navigate])
 
   useEffect(() => {
+    if (!user) return
+    calendarStatus().then((s) => setCalConnected(s.connected)).catch(() => setCalConnected(false))
+  }, [user])
+
+  useEffect(() => {
     return () => {
       if (savedTimer.current) clearTimeout(savedTimer.current)
     }
   }, [])
+
+  const connectCalendar = async () => {
+    window.location.href = await calendarAuthUrl()
+  }
 
   const handleLangChange = (l: Lang) => {
     setLanguage(l)
@@ -155,6 +165,22 @@ export default function SettingsScreen() {
                 onChange={(e) => setDefaultAddress(e.target.value)}
                 className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] py-3 px-4 text-base text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] transition-shadow duration-150 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               />
+            </div>
+
+            {/* Google Calendar */}
+            <div className="mt-7">
+              <p className="mb-2 block text-sm font-medium text-[var(--color-ink)]">Google Calendar</p>
+              {calConnected ? (
+                <p className="text-sm text-[var(--color-primary)]">Connected — meetups can be added to your calendar.</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={connectCalendar}
+                  className="cursor-pointer rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-5 py-3 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                >
+                  Connect Google Calendar
+                </button>
+              )}
             </div>
 
             {/* Error */}

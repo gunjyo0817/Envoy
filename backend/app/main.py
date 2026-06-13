@@ -1,4 +1,4 @@
-import uuid, asyncio, os, urllib.parse, threading
+import uuid, asyncio, os, urllib.parse, threading, secrets
 import httpx
 from dotenv import load_dotenv
 load_dotenv()
@@ -22,7 +22,7 @@ from app.auth import (
     find_or_create_google_user, public_user_for_token,
 )
 from app.services import translate, identify_product, reverse_geocode, match_seeded_listing
-from app import store
+from app import store, gcal
 from app.telegram import notify_seller, notify_buyer, poll_updates
 
 app = FastAPI(title="Envoy API")
@@ -33,6 +33,7 @@ store.init_store()
 
 _sessions: dict[str, dict] = {}   # session_id → {thread_id, last_state}
 _session_locks: dict[str, threading.Lock] = {}
+_oauth_states: dict[str, int] = {}   # oauth state -> app user_id
 
 
 def _lock_for(session_id: str) -> threading.Lock:
@@ -74,6 +75,13 @@ class SettingsRequest(BaseModel):
 class TranslateRequest(BaseModel):
     text: str
     target_lang: str = "en"
+
+
+class CalendarEventRequest(BaseModel):
+    summary: str
+    location: str = ""
+    start_iso: str
+    end_iso: str
 
 
 class VisionRequest(BaseModel):
@@ -318,6 +326,43 @@ async def read_deal(session_id: str, user_id: int = Depends(_require_user)):
     if not deal or deal.get("user_id") != user_id:
         raise HTTPException(status_code=404, detail="Deal not found")
     return deal
+
+
+@app.get("/calendar/auth-url")
+async def calendar_auth_url(user_id: int = Depends(_require_user)):
+    state = secrets.token_urlsafe(24)
+    _oauth_states[state] = user_id
+    return {"url": gcal.auth_url(state)}
+
+
+@app.get("/calendar/callback")
+async def calendar_callback(code: str | None = None, state: str | None = None, error: str | None = None):
+    user_id = _oauth_states.pop(state, None) if state else None
+    if error or not code or user_id is None:
+        return RedirectResponse(f"{FRONTEND_URL}/settings?calendar=error")
+    try:
+        loop = asyncio.get_event_loop()
+        tok = await loop.run_in_executor(None, gcal.exchange_code, code)
+        store.save_google_tokens(user_id, tok["access_token"], tok["refresh_token"],
+                                 tok["expiry"], gcal.SCOPE)
+        return RedirectResponse(f"{FRONTEND_URL}/settings?calendar=connected")
+    except Exception:
+        return RedirectResponse(f"{FRONTEND_URL}/settings?calendar=error")
+
+
+@app.get("/calendar/status")
+async def calendar_status(user_id: int = Depends(_require_user)):
+    return {"connected": store.get_google_tokens(user_id) is not None}
+
+
+@app.post("/calendar/event")
+async def calendar_event(req: CalendarEventRequest, user_id: int = Depends(_require_user)):
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None, gcal.insert_event, user_id, req.summary, req.location, req.start_iso, req.end_iso)
+    if result is None:
+        raise HTTPException(status_code=409, detail="Calendar not connected")
+    return result
 
 
 @app.post("/translate")
