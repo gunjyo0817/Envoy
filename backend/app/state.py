@@ -44,7 +44,7 @@ class ProcurementState(TypedDict):
     human_feedback: str | None
     # Control
     status: Literal[
-        "searching", "reviewing", "awaiting_human",
+        "searching", "reviewing", "awaiting_human", "awaiting_seller",
         "negotiating", "coordinating", "done", "failed"
     ]
     degraded: list[str]
