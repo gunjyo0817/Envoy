@@ -16,7 +16,7 @@ export const STRINGS = {
   // Input screen
   'input.heading': { en: 'What should I find for you?', de: 'Was soll ich für dich finden?', zh: '想找什麼？讓我幫你' },
   'input.item': { en: 'The item', de: 'Der Artikel', zh: '物品' },
-  'input.budget': { en: 'Max budget', de: 'Maximalbudget', zh: '最高預算' },
+  'input.budget': { en: 'Budget range', de: 'Budgetbereich', zh: '預算範圍' },
   'input.condition': { en: 'Minimum condition', de: 'Mindestzustand', zh: '最低狀態' },
   'input.city': { en: 'Your city', de: 'Deine Stadt', zh: '你的城市' },
   'input.submit': { en: 'Find the best deal', de: 'Bestes Angebot finden', zh: '幫我找最划算的' },

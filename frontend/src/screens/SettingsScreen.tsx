@@ -18,7 +18,14 @@ export default function SettingsScreen() {
   const [error, setError] = useState<string | null>(null)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // No session (logged out, or token invalidated by a backend restart) →
+  // bounce to the buyer flow, which renders the auth screen.
   useEffect(() => {
+    if (!user) navigate('/')
+  }, [user, navigate])
+
+  useEffect(() => {
+    if (!user) return
     let active = true
     getSettings()
       .then((s) => {
@@ -28,7 +35,9 @@ export default function SettingsScreen() {
       })
       .catch(() => {
         if (!active) return
-        setError('Could not load your settings.')
+        // Most likely an expired/invalid token → drop the session and re-auth.
+        logout()
+        navigate('/')
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -36,7 +45,7 @@ export default function SettingsScreen() {
     return () => {
       active = false
     }
-  }, [])
+  }, [user, logout, navigate])
 
   useEffect(() => {
     return () => {
