@@ -97,8 +97,8 @@ def confirm_meetup_node(state: ProcurementState) -> dict:
     already-committed proposal and pending decision from state.
     """
     choice = interrupt(state["pending_decision"])
-    if isinstance(choice, dict) and choice.get("action") == "reschedule":
-        slots = choice.get("slots") or []
+    if isinstance(choice, dict) and choice.get("action") == "reschedule" and (choice.get("slots") or []):
+        slots = choice["slots"]
         pending = {
             "checkpoint": "seller_time",
             "summary": f"Buyer proposes {len(slots)} time(s) to meet. Pick one.",
@@ -110,6 +110,8 @@ def confirm_meetup_node(state: ProcurementState) -> dict:
             "decision_history": state["decision_history"]
                 + [{"checkpoint": "confirm_meetup", "choice": "reschedule", "ts": _ts()}],
         }
+    if isinstance(choice, dict) and choice.get("action") == "reschedule":
+        choice = "reschedule"  # reschedule with no slots → fall back to a fresh re-plan
     ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
     decision_entry = {"checkpoint": "confirm_meetup", "choice": choice, "ts": ts}
     if choice == "cancel":
@@ -139,13 +141,17 @@ def seller_time_turn_node(state: ProcurementState) -> dict:
     """Seller picks one of the buyer's proposed slots (Telegram); re-confirm to buyer."""
     pending = state["pending_decision"]
     slots = pending["context"]["slots"]
-    choice = interrupt(pending)            # "time:<index>"
+    # Loop-guard: only accept a "time:<index>" callback; ignore phase-mismatched
+    # taps (e.g. a stale "seller:counter") so they can't silently pick slot 0.
+    while True:
+        choice = interrupt(pending)
+        if isinstance(choice, str) and choice.startswith("time:"):
+            break
     idx = 0
-    if isinstance(choice, str) and choice.startswith("time:"):
-        try:
-            idx = int(choice.split(":", 1)[1])
-        except ValueError:
-            idx = 0
+    try:
+        idx = int(choice.split(":", 1)[1])
+    except ValueError:
+        idx = 0
     chosen = slots[idx] if 0 <= idx < len(slots) else (slots[0] if slots else None)
     proposal = {**state["meetup_proposal"], "time_suggestion": chosen}
     confirm_pending = {

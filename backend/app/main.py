@@ -236,6 +236,8 @@ class ProposeTimesRequest(BaseModel):
 async def propose_times(session_id: str, req: ProposeTimesRequest):
     if session_id not in _sessions:
         raise HTTPException(status_code=404, detail="Session not found")
+    if not req.slots:
+        raise HTTPException(status_code=400, detail="At least one slot required")
     thread_id = _sessions[session_id]["thread_id"]
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(

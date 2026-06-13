@@ -1,5 +1,6 @@
 from unittest.mock import patch
 from app.agents.coordinate import confirm_meetup_node, seller_time_turn_node
+from app.agents.negotiate import seller_turn_node
 from app.graph import _after_confirm_meetup, _after_seller_time_turn
 
 
@@ -56,3 +57,47 @@ def test_dispatch_routes_time_callback():
     upd = {"callback_query": {"data": "time:1", "message": {"chat": {"id": 55}}}}
     asyncio.new_event_loop().run_until_complete(tg._dispatch(upd, on_reply))
     assert captured == {"sid": "sess-T", "choice": "time:1"}
+
+
+def test_empty_slots_reschedule_falls_back_to_replan():
+    st = _state()
+    with patch("app.agents.coordinate.interrupt",
+               return_value={"action": "reschedule", "slots": []}):
+        out = confirm_meetup_node(st)
+    # No slots → plain re-plan, NOT a stranded seller_time pending and NOT a confirm.
+    assert out["status"] == "coordinating"
+    assert out.get("confirmed") is not True
+
+
+def test_seller_time_turn_ignores_stale_seller_callback_then_takes_time():
+    st = _state()
+    st["pending_decision"] = {"checkpoint": "seller_time", "summary": "", "options": [],
+                              "context": {"slots": ["2026-06-20T15:00:00+02:00", "2026-06-21T11:00:00+02:00"]}}
+    # A stray "seller:counter" tap (wrong phase) must be ignored; the next "time:1" wins.
+    with patch("app.agents.coordinate.interrupt", side_effect=["seller:counter", "time:1"]):
+        out = seller_time_turn_node(st)
+    assert out["meetup_proposal"]["time_suggestion"] == "2026-06-21T11:00:00+02:00"
+
+
+def test_seller_turn_ignores_stale_time_callback_then_takes_accept():
+    import os
+    os.environ["LIVE_SELLER"] = "true"
+    try:
+        st = {
+            "current_candidate_index": 0,
+            "ranked_candidates": [{"price_eur": 200.0, "title": "iPhone 14"}],
+            "budget_max": 250.0, "language": "en",
+            "negotiation_thread": [
+                {"role": "buyer", "text": "o", "act": "initial_offer", "price": 195.0, "ts": "t"}],
+            "decision_history": [], "degraded": [],
+            "pending_decision": {"checkpoint": "seller_turn", "summary": "", "options": [],
+                                 "context": {"buyer_offer": 195.0, "listing_price": 200.0,
+                                             "suggested_counter": 190.0}},
+        }
+        # A stray "time:0" (wrong phase) must be ignored; the next "accept" wins.
+        with patch("app.agents.negotiate.interrupt", side_effect=["time:0", "accept"]):
+            out = seller_turn_node(st)
+        assert out["status"] == "coordinating"
+        assert out["negotiation_thread"][-1]["act"] == "accept"
+    finally:
+        os.environ.pop("LIVE_SELLER", None)

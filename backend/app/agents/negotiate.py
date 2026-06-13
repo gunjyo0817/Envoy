@@ -209,7 +209,14 @@ def _apply_seller_choice(state: ProcurementState, choice: str) -> dict:
 def seller_turn_node(state: ProcurementState) -> dict:
     """The seller's response. Async via Telegram interrupt when LIVE_SELLER, else the mock."""
     if _live_seller():
-        choice = interrupt(state["pending_decision"])
+        # Loop-guard: ignore phase-mismatched callbacks (e.g. a stale "time:N" tap
+        # from a reschedule) so they can't fall through to a silent counter-offer.
+        while True:
+            choice = interrupt(state["pending_decision"])
+            if isinstance(choice, str) and (
+                choice in ("accept", "reject", "counter") or choice.startswith("counter:")
+            ):
+                break
     else:
         ctx = state["pending_decision"]["context"]
         reply = mock_seller_response(ctx["listing_price"], ctx["buyer_offer"])
