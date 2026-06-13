@@ -2,6 +2,33 @@
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
+let _authToken: string | null = null
+export function setAuthToken(t: string | null) { _authToken = t }
+export function authHeaders(): Record<string, string> {
+  return _authToken ? { Authorization: `Bearer ${_authToken}` } : {}
+}
+
+export interface AuthUser { id: number; email: string; name: string; language: string; default_address: string }
+export interface AuthResult { token: string; user: AuthUser }
+
+export async function signup(email: string, password: string, name: string): Promise<AuthResult> {
+  const r = await fetch(`${BASE}/auth/signup`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, name }),
+  })
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Sign up failed')
+  return r.json()
+}
+
+export async function login(email: string, password: string): Promise<AuthResult> {
+  const r = await fetch(`${BASE}/auth/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || 'Login failed')
+  return r.json()
+}
+
 export interface SessionState {
   query?: string
   budget?: number

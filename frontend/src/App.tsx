@@ -7,12 +7,16 @@ import NegotiateScreen from './screens/NegotiateScreen'
 import MeetupScreen from './screens/MeetupScreen'
 import DoneScreen from './screens/DoneScreen'
 import AgentView from './admin/AgentView'
+import AuthScreen from './screens/AuthScreen'
 import { useSession } from './useSession'
+import { useAuth } from './auth/AuthProvider'
 
 function BuyerFlow() {
+  const { user } = useAuth()
   const [sessionId, setSessionId] = useState<string | null>(null)
   const { state, sendFeedback } = useSession(sessionId)
 
+  if (!user) return <AuthScreen />
   if (!sessionId) return <InputScreen onStart={setSessionId} />
 
   const status = state?.status
