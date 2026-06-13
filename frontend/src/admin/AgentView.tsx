@@ -94,7 +94,7 @@ export function AgentConsole({ status, checkpoint, logs, degraded, sessionId, st
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <span className="text-base font-semibold tracking-tight">BuyBot</span>
+              <span className="text-base font-semibold tracking-tight">Envoy</span>
               <span className="rounded bg-[var(--color-surface-raised)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-ink-muted)]">
                 AGENT VIEW
               </span>

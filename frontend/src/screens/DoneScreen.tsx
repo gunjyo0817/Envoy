@@ -14,7 +14,7 @@ export default function DoneScreen({ state }: { state: SessionState }) {
 
   const handleCopy = async () => {
     const lines = [
-      'BuyBot meetup',
+      'Envoy meetup',
       chosen?.title && `Item: ${chosen.title}`,
       p?.location && `Where: ${p.location}`,
       p?.time_suggestion && `When: ${p.time_suggestion}`,
@@ -69,7 +69,7 @@ export default function DoneScreen({ state }: { state: SessionState }) {
           The deal’s done
         </h1>
         <p className="mx-auto mt-3 max-w-[34ch] text-pretty text-center text-base leading-relaxed text-[var(--color-ink-muted)]">
-          BuyBot searched, negotiated and set up the meetup.
+          Envoy searched, negotiated and set up the meetup.
           {savings != null ? ` It talked the seller down €${savings} — all you do is show up.` : ' All you do is show up.'}
         </p>
 

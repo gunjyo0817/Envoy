@@ -7,7 +7,7 @@ export const LANGS: { code: Lang; label: string }[] = [
 
 // Flat key → per-language string. Keep keys short and namespaced by screen.
 export const STRINGS = {
-  'app.name': { en: 'BuyBot', de: 'BuyBot' },
+  'app.name': { en: 'Envoy', de: 'Envoy' },
   'common.continue': { en: 'Continue', de: 'Weiter' },
   'common.cancel': { en: 'Cancel', de: 'Abbrechen' },
   'common.back': { en: 'Back', de: 'Zurück' },

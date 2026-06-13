@@ -8,7 +8,7 @@ interface I18nValue {
 }
 
 const I18nContext = createContext<I18nValue | null>(null)
-const STORAGE_KEY = 'buybot.lang'
+const STORAGE_KEY = 'envoy.lang'
 
 function initialLang(): Lang {
   const saved = localStorage.getItem(STORAGE_KEY)

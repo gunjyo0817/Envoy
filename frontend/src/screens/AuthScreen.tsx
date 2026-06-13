@@ -63,7 +63,7 @@ export default function AuthScreen() {
               </svg>
             </span>
             <span className="text-[1.0625rem] font-bold tracking-tight text-[var(--color-ink)]">
-              BuyBot
+              Envoy
             </span>
           </div>
           <LanguageSwitcher />

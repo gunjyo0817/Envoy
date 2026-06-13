@@ -23,7 +23,7 @@ from app.auth import (
 )
 from app.services import translate, identify_product, reverse_geocode
 
-app = FastAPI(title="BuyBot API")
+app = FastAPI(title="Envoy API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["*"], allow_headers=["*"])
 init_db()

@@ -10,7 +10,7 @@ interface AuthValue {
   logout: () => void
 }
 const AuthContext = createContext<AuthValue | null>(null)
-const KEY = 'buybot.auth'
+const KEY = 'envoy.auth'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)

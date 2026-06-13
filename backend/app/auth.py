@@ -1,7 +1,7 @@
 """Minimal real auth + per-user settings, stdlib only (sqlite3 + pbkdf2)."""
 import os, sqlite3, hashlib, secrets, hmac
 
-_DB_PATH = os.environ.get("BUYBOT_DB", os.path.join(os.path.dirname(__file__), "..", "buybot.db"))
+_DB_PATH = os.environ.get("ENVOY_DB", os.path.join(os.path.dirname(__file__), "..", "envoy.db"))
 # token -> user_id (in-memory; resets on restart, fine for the hackathon)
 _TOKENS: dict[str, int] = {}
 

@@ -157,7 +157,7 @@ export default function InputScreen({ onStart }: Props) {
               </svg>
             </span>
             <span className="text-[1.0625rem] font-bold tracking-tight text-[var(--color-ink)]">
-              BuyBot
+              Envoy
             </span>
           </div>
           <div className="flex items-center gap-3">
