@@ -285,6 +285,19 @@ async def write_settings(req: SettingsRequest, user_id: int = Depends(_require_u
     return update_settings(user_id, req.language, req.default_address)
 
 
+@app.get("/deals")
+async def read_deals(user_id: int = Depends(_require_user)):
+    return store.list_deals(user_id)
+
+
+@app.get("/deals/{session_id}")
+async def read_deal(session_id: str, user_id: int = Depends(_require_user)):
+    deal = store.get_deal(session_id)
+    if not deal or deal.get("user_id") != user_id:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    return deal
+
+
 @app.post("/translate")
 async def translate_text(req: TranslateRequest):
     loop = asyncio.get_event_loop()
