@@ -34,7 +34,17 @@ class FeedbackRequest(BaseModel):
 def _run_graph(thread_id: str, input_or_command, session_id: str):
     graph = get_graph()
     config = {"configurable": {"thread_id": thread_id}}
-    state = graph.invoke(input_or_command, config=config)
+    state = dict(graph.invoke(input_or_command, config=config))
+
+    # Dynamic interrupt() stores its payload in the non-serializable
+    # __interrupt__ channel, not in state["pending_decision"]. Bridge it so the
+    # frontend (which polls pending_decision) sees the checkpoint, and drop the
+    # raw Interrupt object so GET /state stays JSON-serializable.
+    interrupts = state.pop("__interrupt__", None)
+    if interrupts:
+        state["pending_decision"] = interrupts[0].value
+        state["status"] = "awaiting_human"
+
     _sessions[session_id]["last_state"] = state
     agent_name = {
         "searching": "search", "reviewing": "extract",

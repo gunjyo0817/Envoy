@@ -1,5 +1,6 @@
-import os, json
+import os, json, datetime
 import google.generativeai as genai
+from langgraph.types import interrupt
 from app.state import ProcurementState, PendingDecision
 
 _CONDITION_SCORE = {
@@ -25,7 +26,7 @@ def rank_candidates(listings: list[dict], budget: float) -> list[dict]:
 
 def _gemini_insight(candidate: dict, budget: float) -> str:
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     prompt = (
         f"You are a buyer's agent. In one short sentence (max 15 words), explain why "
         f"this listing is a good or bad deal. Budget: €{budget}. "
@@ -61,3 +62,27 @@ def analyst_node(state: ProcurementState) -> dict:
         "pending_decision": pending,
         "status": "awaiting_human",
     }
+
+
+def confirm_candidate_node(state: ProcurementState) -> dict:
+    """Human checkpoint 1: pause for the buyer to approve the top candidate.
+
+    Cheap gate node (no LLM) so resuming re-runs nothing expensive. Routes the
+    buyer's choice without polluting the analyst's ranking work.
+    """
+    if not state["ranked_candidates"]:
+        return {"status": "failed", "pending_decision": None}
+
+    choice = interrupt(state["pending_decision"])
+    ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    entry = {"checkpoint": "confirm_candidate", "choice": choice, "ts": ts}
+    base = {
+        "pending_decision": None,
+        "decision_history": state["decision_history"] + [entry],
+    }
+
+    if choice == "cancel":
+        return {**base, "status": "failed"}
+    if choice == "pick_2":
+        return {**base, "current_candidate_index": 1, "status": "negotiating"}
+    return {**base, "status": "negotiating"}
