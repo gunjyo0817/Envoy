@@ -1,1 +1,96 @@
 @import "tailwindcss";
+
+:root {
+  /* Surfaces */
+  --color-bg:             oklch(0.09 0.000 0);
+  --color-surface:        oklch(0.13 0.000 0);
+  --color-surface-raised: oklch(0.17 0.000 0);
+  --color-border:         oklch(0.22 0.000 0);
+
+  /* Text */
+  --color-ink:            oklch(0.94 0.000 0);
+  --color-ink-muted:      oklch(0.62 0.000 0);
+  --color-ink-faint:      oklch(0.58 0.000 0);
+
+  /* Primary — agent activity, CTAs, success */
+  --color-primary:        oklch(0.54 0.165 150);
+  --color-primary-dim:    oklch(0.38 0.110 150);
+  --color-primary-text:   oklch(1.00 0.000 0);
+
+  /* Accent — human checkpoints, prices, key decisions */
+  --color-accent:         oklch(0.75 0.160 60);
+  --color-accent-dim:     oklch(0.42 0.110 60);
+  --color-accent-text:    oklch(1.00 0.000 0);
+
+  /* Semantic */
+  --color-danger:         oklch(0.65 0.200 22);
+  --color-danger-dim:     oklch(0.30 0.120 22);
+}
+
+html {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+}
+
+/* ── Range slider (budget) ───────────────────────────────── */
+input[type="range"].range-primary {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"].range-primary::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 3px solid var(--color-bg);
+  box-shadow: 0 0 0 1px var(--color-primary), 0 4px 12px oklch(0.62 0.165 150 / 0.4);
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+input[type="range"].range-primary::-webkit-slider-thumb:hover {
+  transform: scale(1.12);
+}
+input[type="range"].range-primary:active::-webkit-slider-thumb {
+  transform: scale(0.94);
+}
+input[type="range"].range-primary::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 3px solid var(--color-bg);
+  box-shadow: 0 0 0 1px var(--color-primary), 0 4px 12px oklch(0.62 0.165 150 / 0.4);
+}
+input[type="range"].range-primary:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px oklch(0.62 0.165 150 / 0.35), 0 0 0 1px var(--color-primary);
+}
+
+/* ── Entrance ────────────────────────────────────────────── */
+@keyframes consoleRise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.console-rise {
+  animation: consoleRise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
