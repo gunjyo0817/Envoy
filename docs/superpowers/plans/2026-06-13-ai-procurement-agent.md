@@ -704,7 +704,7 @@ def _call_pioneer(prompt: str) -> dict:
 
 def _call_gemini_extract(prompt: str) -> dict:
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     result = model.generate_content(prompt)
     text = result.text.strip().removeprefix("```json").removesuffix("```").strip()
     return json.loads(text)
@@ -832,7 +832,7 @@ def rank_candidates(listings: list[dict], budget: float) -> list[dict]:
 
 def _gemini_insight(candidate: dict, budget: float) -> str:
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     prompt = (
         f"You are a buyer's agent. In one short sentence (max 15 words), explain why "
         f"this listing is a good or bad deal. Budget: €{budget}. "
@@ -903,7 +903,7 @@ from app.mock.seller import mock_seller_response
 def _gemini_opening_offer(listing: dict, budget: float) -> dict:
     """Returns {offer_price: float, message_text: str}"""
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     listing_price = listing.get("price_eur", budget)
     prompt = (
         f"You are a buyer's agent negotiating in German. "
@@ -918,7 +918,7 @@ def _gemini_opening_offer(listing: dict, budget: float) -> dict:
 def _gemini_counter_response(thread: list, budget: float, seller_price: float) -> dict:
     """Returns {offer_price: float, message_text: str, recommendation: str}"""
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     history = "\n".join([f"{m['role']}: {m['text']}" for m in thread[-4:]])
     prompt = (
         f"Seller countered at €{seller_price}. Budget: €{budget}. "
@@ -1105,7 +1105,7 @@ def _get_travel_time(origin: str, destination: str) -> dict:
 def _gemini_meetup_proposal(buyer_location: str, seller_location: str,
                              buyer_route: dict, final_price: float) -> dict:
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     prompt = (
         f"Suggest a convenient public meetup location between '{buyer_location}' and "
         f"'{seller_location}' in München (a Bahnhof, Marktplatz, or well-known landmark). "
@@ -2430,7 +2430,7 @@ def _call_pioneer(text: str) -> tuple[dict, float]:
 
 def _call_gemini(text: str) -> tuple[dict, float]:
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     prompt = LISTING_PROMPT_TEMPLATE.format(text=text)
     t0 = time.perf_counter()
     result = model.generate_content(prompt)

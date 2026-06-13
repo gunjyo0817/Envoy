@@ -21,3 +21,11 @@ venv/
 # IDE
 .idea/
 .vscode/
+.gstack/
+
+# Local agent tooling & generated design docs (not project code)
+.claude/skills/impeccable/
+.impeccable/
+.superpowers/
+DESIGN.md
+PRODUCT.md

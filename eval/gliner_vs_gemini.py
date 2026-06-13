@@ -90,7 +90,7 @@ def _call_pioneer(text: str) -> tuple[dict, float]:
 
 def _call_gemini(text: str) -> tuple[dict, float]:
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     prompt = (
         'Extract from this second-hand listing. Return JSON only, no markdown:\n'
         '{"brand": str, "model": str, "condition": "new"|"like_new"|"very_good"|"good"|"acceptable",'
