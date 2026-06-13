@@ -34,3 +34,25 @@ def test_seller_time_turn_sets_concrete_time_and_reconfirms():
     assert out["pending_decision"]["checkpoint"] == "confirm_meetup"
     assert out["status"] == "awaiting_human"
     assert _after_seller_time_turn(out) == "confirm_meetup"
+
+
+def test_build_seller_time_message_lists_slots():
+    import app.telegram as tg
+    pending = {"summary": "Buyer proposes 2 time(s) to meet. Pick one.",
+               "context": {"slots": ["2026-06-20T15:00:00+02:00", "2026-06-21T11:00:00+02:00"]}}
+    text, buttons = tg.build_seller_time_message(pending)
+    cbs = [cb for _, cb in buttons]
+    assert cbs == ["time:0", "time:1"]
+
+
+def test_dispatch_routes_time_callback():
+    import importlib, os, tempfile, asyncio
+    import app.store as store, app.telegram as tg
+    fd, p = tempfile.mkstemp(suffix=".db"); os.close(fd); os.environ["ENVOY_DB"] = p
+    importlib.reload(store); store.init_store(); importlib.reload(tg)
+    store.register_chat(55, "seller"); store.attach_session(55, "sess-T")
+    captured = {}
+    async def on_reply(sid, choice): captured.update(sid=sid, choice=choice)
+    upd = {"callback_query": {"data": "time:1", "message": {"chat": {"id": 55}}}}
+    asyncio.new_event_loop().run_until_complete(tg._dispatch(upd, on_reply))
+    assert captured == {"sid": "sess-T", "choice": "time:1"}
