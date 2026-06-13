@@ -38,6 +38,15 @@ def init_store() -> None:
         cols = [r["name"] for r in conn.execute("PRAGMA table_info(deals)").fetchall()]
         if "negotiation_thread" not in cols:
             conn.execute("ALTER TABLE deals ADD COLUMN negotiation_thread TEXT")
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS google_tokens (
+                user_id       INTEGER PRIMARY KEY,
+                access_token  TEXT,
+                refresh_token TEXT,
+                expiry        TEXT,
+                scope         TEXT
+            )"""
+        )
 
 
 def register_chat(chat_id: int, role: str, user_id: int | None = None) -> None:
@@ -106,3 +115,31 @@ def get_deal(session_id: str) -> dict | None:
     with _connect() as conn:
         row = conn.execute("SELECT * FROM deals WHERE session_id=?", (session_id,)).fetchone()
     return _row_to_deal(row) if row else None
+
+
+def save_google_tokens(user_id: int, access_token: str, refresh_token: str | None,
+                       expiry: str, scope: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """INSERT INTO google_tokens (user_id, access_token, refresh_token, expiry, scope)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET
+                 access_token=excluded.access_token,
+                 refresh_token=COALESCE(excluded.refresh_token, google_tokens.refresh_token),
+                 expiry=excluded.expiry, scope=excluded.scope""",
+            (user_id, access_token, refresh_token, expiry, scope),
+        )
+
+
+def update_google_access(user_id: int, access_token: str, expiry: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE google_tokens SET access_token=?, expiry=? WHERE user_id=?",
+            (access_token, expiry, user_id),
+        )
+
+
+def get_google_tokens(user_id: int) -> dict | None:
+    with _connect() as conn:
+        row = conn.execute("SELECT * FROM google_tokens WHERE user_id=?", (user_id,)).fetchone()
+    return dict(row) if row else None
