@@ -173,6 +173,27 @@ export async function identifyImage(imageBase64: string): Promise<string> {
   return data.query ?? ''
 }
 
+export interface VisionSearchResult {
+  query: string
+  matched_listing: {
+    title?: string
+    price_text?: string
+    location?: string
+    image_url?: string
+    platform?: string
+  } | null
+}
+
+export async function visionSearch(imageBase64: string): Promise<VisionSearchResult> {
+  const r = await fetch(`${BASE}/vision/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image_base64: imageBase64 }),
+  })
+  if (!r.ok) throw new Error('Could not search from the image')
+  return r.json()
+}
+
 export async function getState(sessionId: string): Promise<SessionState> {
   const r = await fetch(`${BASE}/session/${sessionId}/state`)
   return r.json()
