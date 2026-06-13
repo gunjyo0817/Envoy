@@ -2,7 +2,7 @@ import uuid, asyncio, os
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langgraph.types import Command
@@ -10,10 +10,14 @@ from langgraph.types import Command
 from app.graph import get_graph
 from app.state import initial_state
 from app.sessions import register_ws, unregister_ws, broadcast, get_logs
+from app.auth import (
+    init_db, signup, login, user_id_for_token, get_settings, update_settings, AuthError,
+)
 
 app = FastAPI(title="BuyBot API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["*"], allow_headers=["*"])
+init_db()
 
 _sessions: dict[str, dict] = {}   # session_id → {thread_id, last_state}
 
@@ -31,6 +35,22 @@ class SessionRequest(BaseModel):
 class FeedbackRequest(BaseModel):
     choice: str
     free_text: str | None = None
+
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+    name: str = ""
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class SettingsRequest(BaseModel):
+    language: str | None = None
+    default_address: str | None = None
 
 
 def _run_graph(thread_id: str, input_or_command, session_id: str):
@@ -118,6 +138,40 @@ async def get_result(session_id: str):
     if state.get("status") != "done":
         raise HTTPException(status_code=400, detail="Session not complete")
     return state.get("meetup_proposal")
+
+
+def _require_user(authorization: str | None = Header(default=None)) -> int:
+    token = authorization.removeprefix("Bearer ").strip() if authorization else None
+    user_id = user_id_for_token(token)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return user_id
+
+
+@app.post("/auth/signup")
+async def auth_signup(req: SignupRequest):
+    try:
+        return signup(req.email, req.password, req.name)
+    except AuthError as e:
+        raise HTTPException(status_code=e.code, detail=e.detail)
+
+
+@app.post("/auth/login")
+async def auth_login(req: LoginRequest):
+    try:
+        return login(req.email, req.password)
+    except AuthError as e:
+        raise HTTPException(status_code=e.code, detail=e.detail)
+
+
+@app.get("/settings")
+async def read_settings(user_id: int = Depends(_require_user)):
+    return get_settings(user_id)
+
+
+@app.put("/settings")
+async def write_settings(req: SettingsRequest, user_id: int = Depends(_require_user)):
+    return update_settings(user_id, req.language, req.default_address)
 
 
 @app.websocket("/session/{session_id}/stream")
