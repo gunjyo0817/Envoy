@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { createSession } from '../api'
+import { useI18n } from '../i18n/I18nProvider'
+import LanguageSwitcher from '../components/LanguageSwitcher'
 
 interface Props {
   onStart: (sessionId: string) => void
@@ -16,6 +18,7 @@ const CONDITIONS: { value: string; label: string }[] = [
 const AGENTS = ['Search', 'Extract', 'Analyst', 'Negotiate', 'Coordinate']
 
 export default function InputScreen({ onStart }: Props) {
+  const { t } = useI18n()
   const [query, setQuery] = useState('')
   const [budget, setBudget] = useState(200)
   const [condition, setCondition] = useState('good+')
@@ -76,13 +79,16 @@ export default function InputScreen({ onStart }: Props) {
               BuyBot
             </span>
           </div>
-          <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-ink-muted)]">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-primary)] opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-primary)]" />
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-ink-muted)]">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-primary)] opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-primary)]" />
+              </span>
+              Agents ready
             </span>
-            Agents ready
-          </span>
+            <LanguageSwitcher />
+          </div>
         </header>
 
         {/* Heading */}
@@ -90,7 +96,7 @@ export default function InputScreen({ onStart }: Props) {
           <h1
             className="text-balance text-[2rem] font-bold leading-[1.1] tracking-[-0.02em] text-[var(--color-ink)] sm:text-4xl"
           >
-            What should I find for you?
+            {t('input.heading')}
           </h1>
           <p className="mt-3 max-w-[42ch] text-pretty text-base leading-relaxed text-[var(--color-ink-muted)]">
             Name one thing and a budget. My agents search every marketplace,
@@ -107,7 +113,7 @@ export default function InputScreen({ onStart }: Props) {
               htmlFor="query"
               className="mb-2 block text-sm font-medium text-[var(--color-ink)]"
             >
-              The item
+              {t('input.item')}
             </label>
             <div className="relative">
               <span aria-hidden className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]">
@@ -132,7 +138,7 @@ export default function InputScreen({ onStart }: Props) {
           <div className="mt-7">
             <div className="mb-3 flex items-baseline justify-between">
               <label htmlFor="budget" className="text-sm font-medium text-[var(--color-ink)]">
-                Max budget
+                {t('input.budget')}
               </label>
               <span className="text-2xl font-bold tabular-nums text-[var(--color-ink)]">
                 €{budget}
@@ -161,7 +167,7 @@ export default function InputScreen({ onStart }: Props) {
           {/* Condition — ordinal segmented pills */}
           <fieldset className="mt-7">
             <legend className="mb-2.5 text-sm font-medium text-[var(--color-ink)]">
-              Minimum condition
+              {t('input.condition')}
             </legend>
             <div role="radiogroup" className="flex flex-wrap gap-2">
               {CONDITIONS.map((c) => {
@@ -189,7 +195,7 @@ export default function InputScreen({ onStart }: Props) {
           {/* Location */}
           <div className="mt-7">
             <label htmlFor="location" className="mb-2 block text-sm font-medium text-[var(--color-ink)]">
-              Your city
+              {t('input.city')}
             </label>
             <div className="relative">
               <span aria-hidden className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)]">
@@ -237,7 +243,7 @@ export default function InputScreen({ onStart }: Props) {
               </>
             ) : (
               <>
-                Find the best deal
+                {t('input.submit')}
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M5 12h14M13 6l6 6-6 6" />
                 </svg>
