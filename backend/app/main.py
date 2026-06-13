@@ -21,7 +21,7 @@ from app.auth import (
     init_db, signup, login, user_id_for_token, get_settings, update_settings, AuthError,
     find_or_create_google_user, public_user_for_token,
 )
-from app.services import translate, identify_product, reverse_geocode
+from app.services import translate, identify_product, reverse_geocode, match_seeded_listing
 from app import store
 from app.telegram import notify_seller, notify_buyer, poll_updates
 
@@ -309,6 +309,17 @@ async def vision_identify(req: VisionRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"query": query}
+
+
+@app.post("/vision/search")
+async def vision_search(req: VisionRequest):
+    loop = asyncio.get_event_loop()
+    try:
+        query = await loop.run_in_executor(None, identify_product, req.image_base64)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    match = await loop.run_in_executor(None, match_seeded_listing, query)
+    return {"query": query, "matched_listing": match}
 
 
 @app.websocket("/session/{session_id}/stream")
