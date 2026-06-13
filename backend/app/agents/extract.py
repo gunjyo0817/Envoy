@@ -22,10 +22,16 @@ def _normalize_condition(text: str) -> str:
     return "good"
 
 def _parse_price(text: str) -> float | None:
-    nums = re.findall(r'\d+(?:[.,]\d+)?', text.replace(".", "").replace(",", "."))
+    # Prefer the price the speaker is *proposing*: the number after the last
+    # German "für" ("for"), else the last number in the message. This avoids
+    # grabbing an echoed earlier price, e.g. "€165 ist wenig, ich mache €179"
+    # should read 179, not 165.
+    cleaned = text.replace(".", "").replace(",", ".")
+    fuer = re.findall(r'für\s*€?\s*(\d+(?:\.\d+)?)', cleaned, flags=re.IGNORECASE)
+    nums = fuer if fuer else re.findall(r'\d+(?:\.\d+)?', cleaned)
     if nums:
         try:
-            return float(nums[0])
+            return float(nums[-1])
         except ValueError:
             pass
     return None

@@ -119,9 +119,16 @@ def decide_offer_node(state: ProcurementState) -> dict:
                       "text": f"Würden Sie €{offer_price:.0f} akzeptieren?"}
 
     seller_reply = mock_seller_response(listing_price, offer_price)
+    # Classification runs for the GLiNER2 eval + degraded story, but the mock
+    # seller already carries authoritative act/price — trust those, fall back to
+    # the classifier only when a field is missing (e.g. real Tavily sellers).
     classified = classify_message(seller_reply["text"], record_degraded=degraded)
-    seller_reply = {**seller_reply, "act": classified["act"],
-                    "price": classified.get("price") or seller_reply.get("price")}
+    seller_reply = {
+        **seller_reply,
+        "act": seller_reply.get("act") or classified.get("act", "stall"),
+        "price": seller_reply["price"] if seller_reply.get("price") is not None
+                 else classified.get("price"),
+    }
     thread.append(seller_reply)
 
     base = {
@@ -200,8 +207,12 @@ def decide_counter_node(state: ProcurementState) -> dict:
     thread.append(buyer_counter)
     seller_final = mock_seller_response(listing_price, counter_price)
     classified = classify_message(seller_final["text"], record_degraded=degraded)
-    seller_final = {**seller_final, "act": classified["act"],
-                    "price": classified.get("price") or seller_final.get("price")}
+    seller_final = {
+        **seller_final,
+        "act": seller_final.get("act") or classified.get("act", "stall"),
+        "price": seller_final["price"] if seller_final.get("price") is not None
+                 else classified.get("price"),
+    }
     thread.append(seller_final)
     final_price = counter_price if seller_final["act"] == "accept" else seller_price
 

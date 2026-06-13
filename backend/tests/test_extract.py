@@ -1,5 +1,19 @@
 from unittest.mock import patch
-from app.agents.extract import extract_listing, classify_message
+from app.agents.extract import extract_listing, classify_message, _parse_price
+
+
+def test_parse_price_prefers_proposed_price_not_echoed():
+    # Seller echoes the low offer then proposes a higher counter — must read 179.
+    assert _parse_price("Hmm, €165 ist etwas wenig. Ich mache es für €179.") == 179.0
+
+def test_parse_price_single_value():
+    assert _parse_price("€175") == 175.0
+
+def test_parse_price_handles_thousands_separator():
+    assert _parse_price("für €1.250") == 1250.0
+
+def test_parse_price_none_when_no_number():
+    assert _parse_price("Preis ist fest.") is None
 
 def test_extract_listing_returns_required_fields():
     sample = "iPhone 14 128GB Space Grey. Sehr guter Zustand. €175. München Schwabing."
