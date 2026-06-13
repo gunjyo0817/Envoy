@@ -101,7 +101,7 @@ export default function ProcessingScreen({ status }: { status?: string }) {
         }}
       />
 
-      <div className="console-rise relative mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[34rem] flex-col">
+      <div className="console-rise relative mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[34rem] flex-col lg:max-w-[44rem]">
         {/* Journey rail */}
         <StepBar status={status} />
 

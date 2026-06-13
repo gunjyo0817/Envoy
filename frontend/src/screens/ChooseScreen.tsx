@@ -38,7 +38,7 @@ export default function ChooseScreen({ state, onFeedback }: Props) {
         }}
       />
 
-      <div className="console-rise relative mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[34rem] flex-col">
+      <div className="console-rise relative mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[34rem] flex-col lg:max-w-[56rem]">
         <StepBar status={state.status} checkpoint={decision?.checkpoint} />
 
         <div className="mt-9 flex flex-1 flex-col">
@@ -52,17 +52,17 @@ export default function ChooseScreen({ state, onFeedback }: Props) {
           </p>
 
           {top && (
-            <div className="mt-5 space-y-3">
+            <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start lg:gap-6">
               <ListingCard candidate={top} rank={0} />
               {rest.length > 0 && (
-                <>
-                  <p className="px-1 pt-1 text-xs font-medium text-[var(--color-ink-faint)]">
+                <div className="space-y-3">
+                  <p className="px-1 pt-1 text-xs font-medium text-[var(--color-ink-faint)] lg:pt-0">
                     Runners-up
                   </p>
                   {rest.map((c, i) => (
                     <ListingCard key={i} candidate={c} rank={i + 1} />
                   ))}
-                </>
+                </div>
               )}
             </div>
           )}

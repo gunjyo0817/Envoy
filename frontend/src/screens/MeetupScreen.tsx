@@ -35,7 +35,7 @@ export default function MeetupScreen({ state, onFeedback }: Props) {
         }}
       />
 
-      <div className="console-rise relative mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[34rem] flex-col">
+      <div className="console-rise relative mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[34rem] flex-col lg:max-w-[52rem]">
         <StepBar status={state.status} checkpoint={decision?.checkpoint} />
 
         <div className="mt-9 flex flex-1 flex-col">
@@ -43,8 +43,9 @@ export default function MeetupScreen({ state, onFeedback }: Props) {
             Here’s where you’ll meet
           </h1>
 
+          <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start lg:gap-6">
           {/* Meeting point — the hero */}
-          <div className="mt-5 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+          <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
             <div className="flex items-start gap-3">
               <span aria-hidden className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--color-accent)] text-[var(--color-accent-text)]">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -89,7 +90,7 @@ export default function MeetupScreen({ state, onFeedback }: Props) {
           </div>
 
           {/* Time + agreed price */}
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
             {proposal?.time_suggestion && (
               <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3.5">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[var(--color-ink-muted)]" aria-hidden>
@@ -113,6 +114,7 @@ export default function MeetupScreen({ state, onFeedback }: Props) {
                 </div>
               </div>
             )}
+          </div>
           </div>
 
           <div className="flex-1" />

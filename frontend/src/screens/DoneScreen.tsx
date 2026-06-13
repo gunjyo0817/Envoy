@@ -54,7 +54,7 @@ export default function DoneScreen({ state }: { state: SessionState }) {
         }}
       />
 
-      <div className="console-rise relative w-full max-w-[30rem]">
+      <div className="console-rise relative w-full max-w-[30rem] lg:max-w-[34rem]">
         {/* Success glyph */}
         <div className="mx-auto mb-7 grid h-20 w-20 place-items-center">
           <span aria-hidden className="absolute h-20 w-20 rounded-full bg-[var(--color-primary)] opacity-20 blur-lg" />
@@ -120,7 +120,7 @@ export default function DoneScreen({ state }: { state: SessionState }) {
           <button
             type="button"
             onClick={() => (window.location.href = '/')}
-            className="order-2 flex-1 rounded-xl bg-[var(--color-primary)] py-3.5 text-sm font-semibold text-[var(--color-primary-text)] transition-[filter] duration-150 hover:brightness-110 active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:order-1"
+            className="order-2 flex-1 cursor-pointer rounded-xl bg-[var(--color-primary)] py-3.5 text-sm font-semibold text-[var(--color-primary-text)] transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.98] active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:order-1"
           >
             Start a new search
           </button>
@@ -128,7 +128,7 @@ export default function DoneScreen({ state }: { state: SessionState }) {
             type="button"
             onClick={handleCopy}
             aria-live="polite"
-            className="order-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--color-surface-raised)] px-5 py-3.5 text-sm font-medium text-[var(--color-ink)] transition-colors duration-150 hover:text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border)] sm:order-2"
+            className="order-1 inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--color-surface-raised)] px-5 py-3.5 text-sm font-medium text-[var(--color-ink)] transition-[background-color,transform] duration-150 hover:bg-[var(--color-surface)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border)] sm:order-2"
           >
             {copied ? (
               <>

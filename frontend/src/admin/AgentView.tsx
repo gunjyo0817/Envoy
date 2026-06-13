@@ -89,7 +89,7 @@ export function AgentConsole({ status, checkpoint, logs, degraded, sessionId, st
 
   return (
     <div className="min-h-dvh bg-[var(--color-bg)] px-5 py-8 text-[var(--color-ink)] sm:px-8" style={{ fontFamily: MONO }}>
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-4xl lg:max-w-5xl">
         {/* Header */}
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -116,7 +116,7 @@ export function AgentConsole({ status, checkpoint, logs, degraded, sessionId, st
               type="button"
               onClick={onStart}
               disabled={starting}
-              className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-primary-text)] transition-[filter] duration-150 hover:brightness-110 active:brightness-95 disabled:opacity-50"
+              className="cursor-pointer rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-[var(--color-primary-text)] transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:brightness-100 disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
             >
               {starting ? 'Starting…' : sessionId ? 'Restart' : 'Run demo'}
             </button>

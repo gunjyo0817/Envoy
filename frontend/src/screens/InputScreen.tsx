@@ -60,7 +60,7 @@ export default function InputScreen({ onStart }: Props) {
         }}
       />
 
-      <div className="console-rise relative mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[34rem] flex-col">
+      <div className="console-rise relative mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[34rem] flex-col lg:max-w-[40rem]">
         {/* Brand + readiness */}
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -173,10 +173,10 @@ export default function InputScreen({ onStart }: Props) {
                     role="radio"
                     aria-checked={active}
                     onClick={() => setCondition(c.value)}
-                    className={`rounded-lg px-3.5 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
+                    className={`cursor-pointer rounded-lg px-3.5 py-2 text-sm font-medium transition-[background-color,color,transform] duration-150 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] ${
                       active
                         ? 'bg-[var(--color-primary)] text-[var(--color-primary-text)]'
-                        : 'bg-[var(--color-surface-raised)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+                        : 'bg-[var(--color-surface-raised)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)]'
                     }`}
                   >
                     {c.label}
@@ -225,7 +225,7 @@ export default function InputScreen({ onStart }: Props) {
           <button
             type="submit"
             disabled={!canSubmit}
-            className="mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] py-4 text-base font-semibold text-[var(--color-primary-text)] transition-[filter,transform] duration-150 hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:brightness-100"
+            className="mt-8 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] py-4 text-base font-semibold text-[var(--color-primary-text)] transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.99] active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:brightness-100 disabled:active:scale-100"
           >
             {loading ? (
               <>

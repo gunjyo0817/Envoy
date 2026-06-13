@@ -47,8 +47,8 @@ export default function CheckpointBanner({ decision, onChoice, loading, eyebrow 
               onClick={() => onChoice(opt.id)}
               className={
                 isPrimary
-                  ? 'inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-semibold text-[var(--color-primary-text)] transition-[filter] duration-150 hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[oklch(0.14_0.025_60)]'
-                  : 'inline-flex items-center rounded-xl bg-[var(--color-surface-raised)] px-4 py-3 text-sm font-medium text-[var(--color-ink-muted)] transition-colors duration-150 hover:text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border)]'
+                  ? 'inline-flex cursor-pointer items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-semibold text-[var(--color-primary-text)] transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.98] active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:brightness-100 disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[oklch(0.14_0.025_60)]'
+                  : 'inline-flex cursor-pointer items-center rounded-xl bg-[var(--color-surface-raised)] px-4 py-3 text-sm font-medium text-[var(--color-ink-muted)] transition-[background-color,color,transform] duration-150 hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[var(--color-surface-raised)] disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border)]'
               }
             >
               {isPrimary && loading && (

@@ -41,13 +41,13 @@ export default function NegotiateScreen({ state, onFeedback }: Props) {
         }}
       />
 
-      <div className="console-rise relative mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[34rem] flex-col">
+      <div className="console-rise relative mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[34rem] flex-col lg:max-w-[48rem]">
         <StepBar status={state.status} checkpoint={decision?.checkpoint} />
 
         <div className="mt-9 flex flex-1 flex-col">
           {/* What we're negotiating */}
           {listing && (
-            <header>
+            <header className="w-full lg:mx-auto lg:max-w-[42rem]">
               <h1 className="text-balance text-xl font-bold leading-snug tracking-[-0.01em] text-[var(--color-ink)]">
                 {listing.title}
               </h1>
@@ -70,7 +70,7 @@ export default function NegotiateScreen({ state, onFeedback }: Props) {
           )}
 
           {/* The conversation */}
-          <div className="mt-6">
+          <div className="mt-6 w-full lg:mx-auto lg:max-w-[42rem]">
             {thread.length > 0 ? (
               <NegotiationThread thread={thread} />
             ) : (
@@ -80,7 +80,7 @@ export default function NegotiateScreen({ state, onFeedback }: Props) {
 
           <div className="flex-1" />
 
-          <div className="mt-7">
+          <div className="mt-7 w-full lg:mx-auto lg:max-w-[42rem]">
             <CheckpointBanner
               decision={decision}
               onChoice={handleChoice}
