@@ -20,7 +20,7 @@
   /* Accent — human checkpoints, prices, key decisions */
   --color-accent:         oklch(0.75 0.160 60);
   --color-accent-dim:     oklch(0.42 0.110 60);
-  --color-accent-text:    oklch(1.00 0.000 0);
+  --color-accent-text:    oklch(0.20 0.030 60);
 
   /* Semantic */
   --color-danger:         oklch(0.65 0.200 22);
@@ -86,6 +86,34 @@ input[type="range"].range-primary:focus-visible::-webkit-slider-thumb {
 }
 .console-rise {
   animation: consoleRise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Indeterminate progress sweep ────────────────────────── */
+@keyframes indeterminateSweep {
+  0%   { transform: translateX(-110%); }
+  100% { transform: translateX(360%); }
+}
+.indeterminate-bar {
+  animation: indeterminateSweep 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+/* Soft phase-glyph breathing glow */
+@keyframes breathe {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%      { opacity: 0.9; transform: scale(1.06); }
+}
+.breathe {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .indeterminate-bar {
+    animation: none;
+    transform: translateX(0);
+    width: 100% !important;
+    opacity: 0.6;
+  }
+  .breathe { animation: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

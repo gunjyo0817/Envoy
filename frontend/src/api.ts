@@ -7,6 +7,7 @@ export interface SessionState {
   budget?: number
   status?: string
   ranked_candidates?: Candidate[]
+  current_candidate_index?: number
   pending_decision?: PendingDecision | null
   negotiation_thread?: NegotiationMessage[]
   meetup_proposal?: MeetupProposal | null
