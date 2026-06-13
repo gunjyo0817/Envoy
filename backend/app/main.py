@@ -249,6 +249,8 @@ async def translate_text(req: TranslateRequest):
 
 @app.get("/geocode/reverse")
 async def geocode_reverse(lat: float, lng: float):
+    if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+        raise HTTPException(status_code=422, detail="Invalid coordinates")
     loop = asyncio.get_event_loop()
     location = await loop.run_in_executor(None, reverse_geocode, lat, lng)
     return {"location": location}
