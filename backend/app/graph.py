@@ -41,6 +41,8 @@ def _after_seller_turn(state: ProcurementState) -> str:
 
 
 def _after_decide_counter(state: ProcurementState) -> str:
+    if state["status"] == "awaiting_seller":
+        return "seller_turn"
     if state["status"] == "coordinating":
         return "plan_meetup"
     return "make_offer"  # walked away → try next candidate
@@ -104,7 +106,7 @@ def build_graph() -> tuple:
     builder.add_conditional_edges(
         "decide_counter",
         _after_decide_counter,
-        {"make_offer": "make_offer", "plan_meetup": "plan_meetup"},
+        {"seller_turn": "seller_turn", "make_offer": "make_offer", "plan_meetup": "plan_meetup"},
     )
     builder.add_edge("plan_meetup", "confirm_meetup")
     builder.add_conditional_edges(

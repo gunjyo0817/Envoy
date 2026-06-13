@@ -291,23 +291,27 @@ def decide_counter_node(state: ProcurementState) -> dict:
         return {**base, "negotiation_thread": [],
                 "current_candidate_index": idx + 1, "status": "negotiating"}
 
-    # counter back, then resolve with one more seller turn
+    # counter back → hand to the seller again (async/real), do NOT auto-close
     counter_price = suggested_counter
     buyer_counter: NegotiationMessage = {
         "role": "buyer", "text": counter_data["message_text"],
         "act": "counter_offer", "price": float(counter_price), "ts": _ts(),
     }
     thread.append(buyer_counter)
-    seller_final = mock_seller_response(listing_price, counter_price)
-    classified = classify_message(seller_final["text"], record_degraded=degraded)
-    seller_final = {
-        **seller_final,
-        "act": seller_final.get("act") or classified.get("act", "stall"),
-        "price": seller_final["price"] if seller_final.get("price") is not None
-                 else classified.get("price"),
+    suggestion = _gemini_seller_suggestion(listing_price, counter_price, state.get("language", "en"))
+    seller_pending: PendingDecision = {
+        "checkpoint": "seller_turn",
+        "summary": f"Buyer counters at €{counter_price:.0f} (listed €{listing_price:.0f}). Reply?",
+        "options": [
+            {"id": "accept", "label": f"Accept €{counter_price:.0f}"},
+            {"id": "counter", "label": f"Counter €{suggestion['counter_price']:.0f}"},
+            {"id": "reject", "label": "Reject"},
+        ],
+        "context": {
+            "buyer_offer": float(counter_price), "listing_price": float(listing_price),
+            "suggested_counter": float(suggestion["counter_price"]),
+            "draft_text": suggestion["message_text"],
+        },
     }
-    thread.append(seller_final)
-    final_price = counter_price if seller_final["act"] == "accept" else seller_price
-
     return {**base, "negotiation_thread": thread,
-            "final_price": float(final_price), "status": "coordinating"}
+            "pending_decision": seller_pending, "status": "awaiting_seller"}
