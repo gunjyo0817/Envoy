@@ -10,15 +10,22 @@ def _ts() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
-def _gemini_opening_offer(listing: dict, budget: float) -> dict:
+_LANG_NAME = {"en": "English", "de": "German"}
+
+
+def _lang_name(code: str) -> str:
+    return _LANG_NAME.get(code, "English")
+
+
+def _gemini_opening_offer(listing: dict, budget: float, language: str = "en") -> dict:
     """Returns {offer_price: float, message_text: str}"""
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
     model = genai.GenerativeModel("gemini-3.5-flash")
     listing_price = listing.get("price_eur", budget)
     prompt = (
-        f"You are a buyer's agent negotiating in German. "
-        f"Listing price: €{listing_price}. Your max budget: €{budget}. "
-        f"Suggest a strategic opening offer (80-90% of listing price) and write a polite German message. "
+        f"You are a buyer's agent. Listing price: €{listing_price}. Your max budget: €{budget}. "
+        f"Suggest a strategic opening offer (80-90% of listing price) and write a short, polite "
+        f"message to the seller in {_lang_name(language)}. "
         f"Return JSON only: {{\"offer_price\": float, \"message_text\": str}}"
     )
     text = model.generate_content(prompt).text.strip()
@@ -26,17 +33,18 @@ def _gemini_opening_offer(listing: dict, budget: float) -> dict:
     return json.loads(text)
 
 
-def _gemini_counter_response(thread: list, budget: float, seller_price: float) -> dict:
-    """Returns {offer_price: float, message_text: str, recommendation: str}"""
+def _gemini_counter_response(thread: list, budget: float, seller_price: float,
+                             suggested_counter: float, language: str = "en") -> dict:
+    """Returns {message_text: str, recommendation: str}"""
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
     model = genai.GenerativeModel("gemini-3.5-flash")
     history = "\n".join([f"{m['role']}: {m['text']}" for m in thread[-4:]])
     prompt = (
-        f"Seller countered at €{seller_price}. Budget: €{budget}. "
-        f"Recent messages:\n{history}\n"
-        f"Recommend: accept, counter at X, or walk away? "
-        f"Return JSON: {{\"offer_price\": float|null, \"message_text\": str, "
-        f"\"recommendation\": \"accept\"|\"counter\"|\"walk_away\"}}"
+        f"The seller countered at €{seller_price}; your budget is €{budget}. "
+        f"You will counter back at €{suggested_counter:.0f}. Recent messages:\n{history}\n"
+        f"Write a short, polite message to the seller in {_lang_name(language)} proposing €{suggested_counter:.0f}, "
+        f"and give your recommendation. "
+        f"Return JSON: {{\"message_text\": str, \"recommendation\": \"accept\"|\"counter\"|\"walk_away\"}}"
     )
     text = model.generate_content(prompt).text.strip()
     text = text.removeprefix("```json").removesuffix("```").strip()
@@ -65,7 +73,7 @@ def make_offer_node(state: ProcurementState) -> dict:
     listing = candidates[idx]
     listing_price = listing.get("price_eur") or state["budget_max"]
 
-    offer_data = _gemini_opening_offer(listing, state["budget_max"])
+    offer_data = _gemini_opening_offer(listing, state["budget_max"], state.get("language", "en"))
     offer_price = offer_data.get("offer_price") or round(listing_price * 0.85)
     buyer_msg: NegotiationMessage = {
         "role": "buyer", "text": offer_data["message_text"],
@@ -115,8 +123,10 @@ def decide_offer_node(state: ProcurementState) -> dict:
     offer_price = thread[-1]["price"]
     if choice == "lower":
         offer_price = round(listing_price * 0.78)
-        thread[-1] = {**thread[-1], "price": float(offer_price),
-                      "text": f"Würden Sie €{offer_price:.0f} akzeptieren?"}
+        language = state.get("language", "en")
+        lower_text = (f"Würden Sie €{offer_price:.0f} akzeptieren?" if language == "de"
+                      else f"Would you accept €{offer_price:.0f}?")
+        thread[-1] = {**thread[-1], "price": float(offer_price), "text": lower_text}
 
     seller_reply = mock_seller_response(listing_price, offer_price)
     # Classification runs for the GLiNER2 eval + degraded story, but the mock
@@ -151,21 +161,32 @@ def make_counter_node(state: ProcurementState) -> dict:
     degraded = list(state.get("degraded", []))
     listing_price = _listing_price(state)
     thread = list(state["negotiation_thread"])
+    language = state.get("language", "en")
 
     last_seller = next((m for m in reversed(thread) if m["role"] == "seller"), None)
     seller_price = (last_seller.get("price") if last_seller else None) or listing_price
-    counter_data = _gemini_counter_response(thread, state["budget_max"], seller_price)
+    buyer_last = next((m["price"] for m in reversed(thread)
+                       if m["role"] == "buyer" and m.get("price") is not None), None)
+
+    # Counter strictly between the buyer's last offer and the seller's ask.
+    if buyer_last is not None and buyer_last < seller_price:
+        suggested = round((buyer_last + seller_price) / 2)
+        suggested = max(buyer_last + 1, min(suggested, seller_price - 1))
+    else:
+        suggested = max(round(seller_price - 5), 1)
+
+    counter_data = _gemini_counter_response(thread, state["budget_max"], seller_price, suggested, language)
 
     pending: PendingDecision = {
         "checkpoint": "confirm_offer",
         "summary": (f"Seller countered at €{seller_price:.0f}. "
-                    f"Agent recommends: {counter_data['recommendation']}"),
+                    f"Agent recommends: {counter_data.get('recommendation', 'counter')}"),
         "options": [
             {"id": "accept", "label": f"Accept €{seller_price:.0f}"},
-            {"id": "counter", "label": f"Counter at €{counter_data.get('offer_price', seller_price - 5):.0f}"},
+            {"id": "counter", "label": f"Counter at €{suggested:.0f}"},
             {"id": "skip", "label": "Walk away"},
         ],
-        "context": {"seller_price": seller_price, "counter_data": counter_data},
+        "context": {"seller_price": seller_price, "suggested_counter": suggested, "counter_data": counter_data},
     }
     return {
         "pending_decision": pending,
@@ -183,6 +204,7 @@ def decide_counter_node(state: ProcurementState) -> dict:
     pending = state["pending_decision"]
     seller_price = pending["context"]["seller_price"]
     counter_data = pending["context"]["counter_data"]
+    suggested_counter = pending["context"]["suggested_counter"]
 
     choice = interrupt(pending)
     entry = {"checkpoint": "confirm_offer", "choice": choice, "ts": _ts()}
@@ -199,7 +221,7 @@ def decide_counter_node(state: ProcurementState) -> dict:
                 "current_candidate_index": idx + 1, "status": "negotiating"}
 
     # counter back, then resolve with one more seller turn
-    counter_price = counter_data.get("offer_price") or (seller_price - 5)
+    counter_price = suggested_counter
     buyer_counter: NegotiationMessage = {
         "role": "buyer", "text": counter_data["message_text"],
         "act": "counter_offer", "price": float(counter_price), "ts": _ts(),

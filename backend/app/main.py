@@ -39,6 +39,7 @@ class SessionRequest(BaseModel):
     condition: str = "good+"
     location: str
     max_distance_km: int = 15
+    language: str = "en"
 
 
 class FeedbackRequest(BaseModel):
@@ -123,7 +124,7 @@ async def create_session(req: SessionRequest):
 
     budget_max = req.budget_max if req.budget_max is not None else (req.budget or 200.0)
     state = initial_state(req.query, req.budget_min, budget_max,
-                          req.condition, req.location, req.max_distance_km)
+                          req.condition, req.location, req.max_distance_km, req.language)
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _run_graph, thread_id, state, session_id)
     return {"session_id": session_id}

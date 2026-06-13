@@ -25,6 +25,7 @@ class ProcurementState(TypedDict):
     condition: str
     location: str
     max_distance_km: int
+    language: str
     # Search
     raw_listings: list[dict]
     structured_listings: list[dict]
@@ -51,12 +52,14 @@ class ProcurementState(TypedDict):
 
 def initial_state(
     query: str, budget_min: float, budget_max: float,
-    condition: str, location: str, max_distance_km: int
+    condition: str, location: str, max_distance_km: int,
+    language: str = "en"
 ) -> ProcurementState:
     return {
         "query": query, "budget_min": budget_min, "budget_max": budget_max,
         "condition": condition,
         "location": location, "max_distance_km": max_distance_km,
+        "language": language,
         "raw_listings": [], "structured_listings": [],
         "ranked_candidates": [], "current_candidate_index": 0,
         "negotiation_thread": [], "final_price": None,
