@@ -57,6 +57,18 @@ export async function updateSettings(patch: Partial<UserSettings>): Promise<User
   return r.json()
 }
 
+export async function calendarStatus(): Promise<{ connected: boolean }> {
+  const r = await fetch(`${BASE}/calendar/status`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to check calendar status')
+  return r.json()
+}
+
+export async function calendarAuthUrl(): Promise<string> {
+  const r = await fetch(`${BASE}/calendar/auth-url`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to start calendar connect')
+  return (await r.json()).url
+}
+
 export interface SessionState {
   query?: string
   budget?: number
