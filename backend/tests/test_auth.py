@@ -6,7 +6,7 @@ def client(monkeypatch):
     # Fresh temp DB per test
     tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
     tmp.close()
-    monkeypatch.setenv("BUYBOT_DB", tmp.name)
+    monkeypatch.setenv("ENVOY_DB", tmp.name)
     import app.auth as auth
     importlib.reload(auth)
     auth.init_db()
