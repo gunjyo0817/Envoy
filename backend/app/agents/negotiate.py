@@ -52,7 +52,7 @@ def negotiate_node(state: ProcurementState) -> dict:
     # --- Round 1: opening offer ---
     if not thread:
         offer_data = _gemini_opening_offer(listing, state["budget"])
-        offer_price = offer_data["offer_price"]
+        offer_price = offer_data.get("offer_price") or round(listing_price * 0.85)
         buyer_msg: NegotiationMessage = {
             "role": "buyer", "text": offer_data["message_text"],
             "act": "initial_offer", "price": offer_price, "ts": ts()
