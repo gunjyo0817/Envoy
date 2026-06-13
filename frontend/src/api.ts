@@ -133,8 +133,30 @@ export async function createSession(params: {
   return data.session_id
 }
 
+function buildGeocodeUrl(baseUrl: string, lat: string, lng: string): string {
+  try {
+    const url = new URL(baseUrl);
+    
+    // Validate numeric parameters
+    if (!/^-?[0-9]+(?:\.[0-9]+)?$/.test(lat)) {
+      throw new Error('Invalid parameter');
+    }
+    if (!/^-?[0-9]+(?:\.[0-9]+)?$/.test(lng)) {
+      throw new Error('Invalid parameter');
+    }
+    
+    // Add query parameters
+    url.searchParams.set('lat', lat);
+    url.searchParams.set('lng', lng);
+    
+    return url.href;
+  } catch {
+    throw new Error('Invalid URL');
+  }
+}
+
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
-  const r = await fetch(`${BASE}/geocode/reverse?lat=${lat}&lng=${lng}`)
+  const r = await fetch(buildGeocodeUrl(`${BASE}/geocode/reverse`, String(lat), String(lng)))
   if (!r.ok) throw new Error('Could not resolve location')
   const data = await r.json()
   return data.location ?? ''
