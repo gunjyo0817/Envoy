@@ -12,7 +12,7 @@ const STORAGE_KEY = 'buybot.lang'
 
 function initialLang(): Lang {
   const saved = localStorage.getItem(STORAGE_KEY)
-  if (saved === 'en' || saved === 'de' || saved === 'zh') return saved
+  if (saved === 'en' || saved === 'de') return saved
   return 'en' // onboarding default is English
 }
 

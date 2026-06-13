@@ -2,7 +2,7 @@
 import os, base64, binascii
 import google.generativeai as genai
 
-_LANG_NAME = {"en": "English", "de": "German", "zh": "Traditional Chinese"}
+_LANG_NAME = {"en": "English", "de": "German"}
 
 # Tiny in-memory cache so re-rendering the same chat doesn't re-hit Gemini.
 _translation_cache: dict[tuple[str, str], str] = {}
