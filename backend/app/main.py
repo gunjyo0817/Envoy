@@ -21,7 +21,7 @@ from app.auth import (
     init_db, signup, login, user_id_for_token, get_settings, update_settings, AuthError,
     find_or_create_google_user, public_user_for_token,
 )
-from app.services import translate, identify_product
+from app.services import translate, identify_product, reverse_geocode
 
 app = FastAPI(title="BuyBot API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
@@ -245,6 +245,13 @@ async def translate_text(req: TranslateRequest):
     loop = asyncio.get_event_loop()
     translation = await loop.run_in_executor(None, translate, req.text, req.target_lang)
     return {"translation": translation}
+
+
+@app.get("/geocode/reverse")
+async def geocode_reverse(lat: float, lng: float):
+    loop = asyncio.get_event_loop()
+    location = await loop.run_in_executor(None, reverse_geocode, lat, lng)
+    return {"location": location}
 
 
 @app.post("/vision/identify")

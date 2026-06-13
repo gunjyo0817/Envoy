@@ -1,5 +1,6 @@
-"""Gemini-backed helper services: text translation and image→query vision."""
+"""Gemini-backed helper services: text translation, image→query vision, reverse geocoding."""
 import os, base64, binascii
+import httpx
 import google.generativeai as genai
 
 _LANG_NAME = {"en": "English", "de": "German"}
@@ -49,3 +50,39 @@ def identify_product(image_base64: str) -> str:
         [prompt, {"mime_type": "image/jpeg", "data": image_bytes}]
     )
     return result.text.strip()
+
+
+def reverse_geocode(lat: float, lng: float) -> str:
+    """Turn coordinates into a human-readable place (city/locality), via Google
+    Geocoding. Falls back to a trimmed lat,lng string if the API is unavailable."""
+    key = os.environ.get("GOOGLE_MAPS_API_KEY", "")
+    fallback = f"{lat:.4f}, {lng:.4f}"
+    if not key:
+        return fallback
+    try:
+        resp = httpx.get(
+            "https://maps.googleapis.com/maps/api/geocode/json",
+            params={"latlng": f"{lat},{lng}", "key": key, "result_type":
+                    "locality|postal_town|administrative_area_level_2|sublocality"},
+            timeout=5.0,
+        )
+        data = resp.json()
+        results = data.get("results") or []
+        if not results:
+            # retry without the result_type filter
+            resp = httpx.get(
+                "https://maps.googleapis.com/maps/api/geocode/json",
+                params={"latlng": f"{lat},{lng}", "key": key},
+                timeout=5.0,
+            )
+            results = resp.json().get("results") or []
+        if results:
+            # Prefer a locality component; else the first formatted address.
+            for r in results:
+                for comp in r.get("address_components", []):
+                    if "locality" in comp.get("types", []):
+                        return comp["long_name"]
+            return results[0].get("formatted_address", fallback)
+    except Exception:
+        pass
+    return fallback
