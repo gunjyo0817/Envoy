@@ -4,41 +4,92 @@ import StepBar from '../components/StepBar'
 import NegotiationThread from '../components/NegotiationThread'
 import CheckpointBanner from '../components/CheckpointBanner'
 
-interface Props { state: SessionState; onFeedback: (choice: string) => Promise<void> }
+interface Props {
+  state: SessionState
+  onFeedback: (choice: string) => Promise<void>
+}
 
 export default function NegotiateScreen({ state, onFeedback }: Props) {
   const [loading, setLoading] = useState(false)
   const thread = state.negotiation_thread ?? []
   const decision = state.pending_decision!
-  const listing = state.ranked_candidates?.[0]
+  const listing = state.ranked_candidates?.[state.current_candidate_index ?? 0]
 
-  // Round 1 and round 2 both render this same component (both confirm_offer),
-  // so re-enable the buttons whenever a new checkpoint arrives.
-  useEffect(() => { setLoading(false) }, [decision?.summary])
+  // Both negotiation rounds render here (both confirm_offer); re-enable the
+  // buttons whenever a fresh checkpoint arrives.
+  useEffect(() => {
+    setLoading(false)
+  }, [decision?.summary])
 
   const handleChoice = async (choice: string) => {
     setLoading(true)
     await onFeedback(choice)
   }
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-xl font-black text-indigo-600 py-4">buybot</div>
-        <StepBar status="negotiating" />
+  // Latest price on the table, for the price rail.
+  const latestPriced = [...thread].reverse().find((m) => m.price != null)
+  const onTable = latestPriced?.price ?? listing?.price_eur
 
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden mt-4">
+  return (
+    <main className="relative min-h-dvh overflow-hidden bg-[var(--color-bg)] px-5 py-10 sm:px-6">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-72 opacity-70"
+        style={{
+          background:
+            'radial-gradient(60% 120% at 50% 0%, oklch(0.75 0.16 60 / 0.12), transparent 70%)',
+        }}
+      />
+
+      <div className="console-rise relative mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[34rem] flex-col">
+        <StepBar status={state.status} checkpoint={decision?.checkpoint} />
+
+        <div className="mt-9 flex flex-1 flex-col">
+          {/* What we're negotiating */}
           {listing && (
-            <div className="px-4 pt-4 pb-2 border-b border-slate-100">
-              <div className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Negotiating</div>
-              <div className="font-semibold text-slate-800 text-sm mt-0.5 truncate">{listing.title}</div>
-              <div className="text-slate-500 text-xs">Listed at €{listing.price_eur}</div>
-            </div>
+            <header>
+              <h1 className="text-balance text-xl font-bold leading-snug tracking-[-0.01em] text-[var(--color-ink)]">
+                {listing.title}
+              </h1>
+              <div className="mt-3 flex items-center gap-3 text-sm">
+                <span className="text-[var(--color-ink-muted)]">
+                  Listed <span className="font-semibold tabular-nums text-[var(--color-ink)]">€{listing.price_eur}</span>
+                </span>
+                {onTable != null && onTable !== listing.price_eur && (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-ink-faint)]" aria-hidden>
+                      <path d="M5 12h14M13 6l6 6-6 6" />
+                    </svg>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-accent)] px-2.5 py-1 text-xs font-semibold text-[var(--color-accent-text)]">
+                      On the table €{onTable}
+                    </span>
+                  </>
+                )}
+              </div>
+            </header>
           )}
-          <NegotiationThread thread={thread} />
-          <CheckpointBanner decision={decision} onChoice={handleChoice} loading={loading} />
+
+          {/* The conversation */}
+          <div className="mt-6">
+            {thread.length > 0 ? (
+              <NegotiationThread thread={thread} />
+            ) : (
+              <p className="text-sm text-[var(--color-ink-muted)]">Opening the conversation…</p>
+            )}
+          </div>
+
+          <div className="flex-1" />
+
+          <div className="mt-7">
+            <CheckpointBanner
+              decision={decision}
+              onChoice={handleChoice}
+              loading={loading}
+              eyebrow="Your call"
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </main>
   )
 }
