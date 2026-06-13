@@ -77,6 +77,13 @@ class TranslateRequest(BaseModel):
     target_lang: str = "en"
 
 
+class CalendarEventRequest(BaseModel):
+    summary: str
+    location: str = ""
+    start_iso: str
+    end_iso: str
+
+
 class VisionRequest(BaseModel):
     image_base64: str
 
@@ -346,6 +353,16 @@ async def calendar_callback(code: str | None = None, state: str | None = None, e
 @app.get("/calendar/status")
 async def calendar_status(user_id: int = Depends(_require_user)):
     return {"connected": store.get_google_tokens(user_id) is not None}
+
+
+@app.post("/calendar/event")
+async def calendar_event(req: CalendarEventRequest, user_id: int = Depends(_require_user)):
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None, gcal.insert_event, user_id, req.summary, req.location, req.start_iso, req.end_iso)
+    if result is None:
+        raise HTTPException(status_code=409, detail="Calendar not connected")
+    return result
 
 
 @app.post("/translate")
