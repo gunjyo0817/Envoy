@@ -111,7 +111,7 @@ export interface WsEvent {
 }
 
 export async function createSession(params: {
-  query: string; budget: number; condition: string;
+  query: string; budget_min: number; budget_max: number; condition: string;
   location: string; max_distance_km: number
 }): Promise<string> {
   const r = await fetch(`${BASE}/session`, {
@@ -121,6 +121,17 @@ export async function createSession(params: {
   })
   const data = await r.json()
   return data.session_id
+}
+
+export async function identifyImage(imageBase64: string): Promise<string> {
+  const r = await fetch(`${BASE}/vision/identify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image_base64: imageBase64 }),
+  })
+  if (!r.ok) throw new Error('Could not identify the image')
+  const data = await r.json()
+  return data.query ?? ''
 }
 
 export async function getState(sessionId: string): Promise<SessionState> {

@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createSession } from '../api'
+import { createSession, identifyImage } from '../api'
 import { useI18n } from '../i18n/I18nProvider'
 import { useAuth } from '../auth/AuthProvider'
 import LanguageSwitcher from '../components/LanguageSwitcher'
@@ -24,23 +25,30 @@ export default function InputScreen({ onStart }: Props) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
-  const [budget, setBudget] = useState(200)
+  const [budgetMin, setBudgetMin] = useState(50)
+  const [budgetMax, setBudgetMax] = useState(200)
   const [condition, setCondition] = useState('good+')
   const [location, setLocation] = useState(user?.default_address || 'München')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [identifying, setIdentifying] = useState(false)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [locating, setLocating] = useState(false)
+  const [locationHint, setLocationHint] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const canSubmit = query.trim().length > 0 && !loading
+  const canSubmit = query.trim().length > 0 && !loading && !identifying
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!query.trim() || loading) return
+    if (!query.trim() || loading || identifying) return
     setLoading(true)
     setError(null)
     try {
       const id = await createSession({
         query: query.trim(),
-        budget,
+        budget_min: budgetMin,
+        budget_max: budgetMax,
         condition,
         location: location.trim() || 'München',
         max_distance_km: 15,
@@ -52,8 +60,68 @@ export default function InputScreen({ onStart }: Props) {
     }
   }
 
-  // Slider fill percentage for the track gradient
-  const pct = ((budget - 50) / (2000 - 50)) * 100
+  const handleImageSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleFile(file)
+    }
+    // Reset so selecting the same file again re-triggers onChange
+    e.target.value = ''
+  }
+
+  const handleFile = (file: File) => {
+    setError(null)
+    const reader = new FileReader()
+    reader.onload = async () => {
+      const dataUrl = reader.result as string
+      setImagePreview(dataUrl)
+      // Strip the "data:...;base64," prefix before sending
+      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
+      setIdentifying(true)
+      try {
+        const identified = await identifyImage(base64)
+        setQuery(identified)
+      } catch {
+        setError('Could not identify the image. Try another photo or type your item.')
+      } finally {
+        setIdentifying(false)
+      }
+    }
+    reader.onerror = () => {
+      setError('Could not read that image file.')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const clearImage = () => {
+    setImagePreview(null)
+  }
+
+  const handleLocate = () => {
+    setError(null)
+    setLocationHint(null)
+    if (!navigator.geolocation) {
+      setError("Couldn't get your location — enter your city manually.")
+      return
+    }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords
+        setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+        setLocationHint('Using current location')
+        setLocating(false)
+      },
+      () => {
+        setError("Couldn't get your location — enter your city manually.")
+        setLocating(false)
+      }
+    )
+  }
+
+  // Slider fill percentages for the track gradients
+  const pctMin = ((budgetMin - 50) / (2000 - 50)) * 100
+  const pctMax = ((budgetMax - 50) / (2000 - 50)) * 100
 
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[var(--color-bg)] px-5 py-10 sm:px-6">
@@ -147,32 +215,109 @@ export default function InputScreen({ onStart }: Props) {
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
+
+            {/* Image upload — a subordinate way to fill the query from a photo */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageSelect}
+            />
+            <div className="mt-2.5 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={identifying}
+                className="flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                Upload a photo
+              </button>
+
+              {identifying && (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--color-ink-muted)]">
+                  <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.3" />
+                    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                  Identifying…
+                </span>
+              )}
+
+              {imagePreview && (
+                <span className="relative inline-block">
+                  <img
+                    src={imagePreview}
+                    alt="Uploaded item"
+                    className="h-10 w-10 rounded-lg object-cover ring-1 ring-[var(--color-border)]"
+                  />
+                  <button
+                    type="button"
+                    aria-label="Remove image"
+                    onClick={clearImage}
+                    className="absolute -right-1.5 -top-1.5 grid h-4 w-4 cursor-pointer place-items-center rounded-full bg-[var(--color-ink)] text-[var(--color-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                  >
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden>
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              )}
+            </div>
           </div>
 
-          {/* Budget */}
+          {/* Budget range */}
           <div className="mt-7">
             <div className="mb-3 flex items-baseline justify-between">
-              <label htmlFor="budget" className="text-sm font-medium text-[var(--color-ink)]">
+              <label htmlFor="budget-min" className="text-sm font-medium text-[var(--color-ink)]">
                 {t('input.budget')}
               </label>
               <span className="text-2xl font-bold tabular-nums text-[var(--color-ink)]">
-                €{budget}
+                €{budgetMin} – €{budgetMax}
               </span>
             </div>
+
+            <label htmlFor="budget-min" className="mb-1.5 block text-xs font-medium text-[var(--color-ink-muted)]">
+              Min budget
+            </label>
             <input
-              id="budget"
+              id="budget-min"
               type="range"
               min={50}
               max={2000}
               step={10}
-              value={budget}
-              onChange={(e) => setBudget(Number(e.target.value))}
+              value={budgetMin}
+              onChange={(e) => setBudgetMin(Math.min(Number(e.target.value), budgetMax))}
               className="range-primary"
               style={{
-                background: `linear-gradient(to right, var(--color-primary) ${pct}%, var(--color-surface-raised) ${pct}%)`,
+                background: `linear-gradient(to right, var(--color-primary) ${pctMin}%, var(--color-surface-raised) ${pctMin}%)`,
               }}
-              aria-valuetext={`€${budget}`}
+              aria-valuetext={`€${budgetMin}`}
             />
+
+            <label htmlFor="budget-max" className="mb-1.5 mt-4 block text-xs font-medium text-[var(--color-ink-muted)]">
+              Max budget
+            </label>
+            <input
+              id="budget-max"
+              type="range"
+              min={50}
+              max={2000}
+              step={10}
+              value={budgetMax}
+              onChange={(e) => setBudgetMax(Math.max(Number(e.target.value), budgetMin))}
+              className="range-primary"
+              style={{
+                background: `linear-gradient(to right, var(--color-primary) ${pctMax}%, var(--color-surface-raised) ${pctMax}%)`,
+              }}
+              aria-valuetext={`€${budgetMax}`}
+            />
+
             <div className="mt-1.5 flex justify-between text-xs tabular-nums text-[var(--color-ink-faint)]">
               <span>€50</span>
               <span>€2000</span>
@@ -222,11 +367,33 @@ export default function InputScreen({ onStart }: Props) {
               <input
                 id="location"
                 autoComplete="off"
-                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] py-3 pl-11 pr-4 text-base text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] transition-shadow duration-150 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] py-3 pl-11 pr-14 text-base text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] transition-shadow duration-150 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(e) => { setLocation(e.target.value); setLocationHint(null) }}
               />
+              <button
+                type="button"
+                aria-label="Use my location"
+                onClick={handleLocate}
+                disabled={locating}
+                className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 cursor-pointer place-items-center rounded-lg text-[var(--color-ink-muted)] transition-colors hover:bg-[var(--color-surface)] hover:text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {locating ? (
+                  <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.3" />
+                    <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+                  </svg>
+                )}
+              </button>
             </div>
+            {locationHint && (
+              <p className="mt-1.5 text-xs font-medium text-[var(--color-ink-muted)]">{locationHint}</p>
+            )}
           </div>
 
           {/* Error */}

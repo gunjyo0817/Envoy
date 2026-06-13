@@ -220,7 +220,8 @@ export default function AgentView() {
     try {
       const id = await createSession({
         query: 'iPhone 14',
-        budget: 200,
+        budget_min: 50,
+        budget_max: 200,
         condition: 'good+',
         location: 'München',
         max_distance_km: 15,
