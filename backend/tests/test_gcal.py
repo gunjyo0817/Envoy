@@ -12,6 +12,20 @@ def _store_with_token(expiry_iso):
     return store
 
 
+def test_insert_event_returns_none_on_revoked_token():
+    import httpx
+    future = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=1)).isoformat()
+    store = _store_with_token(future)
+    import app.gcal as gcal
+    importlib.reload(gcal)
+    err = httpx.HTTPStatusError("403", request=MagicMock(), response=MagicMock(status_code=403))
+    resp = MagicMock(); resp.raise_for_status.side_effect = err
+    with patch("app.gcal.store", store), patch("app.gcal.httpx.post", return_value=resp):
+        out = gcal.insert_event(1, "Pick up X", "Marienplatz",
+                                "2026-06-20T15:00:00+02:00", "2026-06-20T15:30:00+02:00")
+    assert out is None
+
+
 def test_auth_url_contains_offline_and_scope():
     import app.gcal as gcal
     importlib.reload(gcal)

@@ -83,16 +83,23 @@ def query_freebusy(user_id: int, time_min_iso: str, time_max_iso: str) -> list[d
 def insert_event(user_id: int, summary: str, location: str,
                  start_iso: str, end_iso: str) -> dict | None:
     """Insert a calendar event; return {htmlLink} or None if not connected/failed."""
-    token = valid_access_token(user_id)
-    if not token:
-        return None
-    resp = httpx.post(
-        f"{_CAL}/calendars/primary/events",
-        headers={"Authorization": f"Bearer {token}"},
-        json={
-            "summary": summary, "location": location,
-            "start": {"dateTime": start_iso, "timeZone": TZ},
-            "end": {"dateTime": end_iso, "timeZone": TZ},
-        }, timeout=10.0)
-    resp.raise_for_status()
-    return {"htmlLink": resp.json().get("htmlLink")}
+    try:
+        token = valid_access_token(user_id)
+        if not token:
+            return None
+        resp = httpx.post(
+            f"{_CAL}/calendars/primary/events",
+            headers={"Authorization": f"Bearer {token}"},
+            json={
+                "summary": summary, "location": location,
+                "start": {"dateTime": start_iso, "timeZone": TZ},
+                "end": {"dateTime": end_iso, "timeZone": TZ},
+            }, timeout=10.0)
+        resp.raise_for_status()
+        return {"htmlLink": resp.json().get("htmlLink")}
+    except httpx.HTTPStatusError as e:
+        # Revoked access (401/403) or invalid/expired grant (400) → treat as
+        # not-connected so the endpoint returns 409 and the UI prompts a reconnect.
+        if e.response.status_code in (400, 401, 403):
+            return None
+        raise
