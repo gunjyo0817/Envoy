@@ -1,0 +1,90 @@
+import os, json, datetime
+import httpx
+import google.generativeai as genai
+from langgraph.types import interrupt
+from app.state import ProcurementState, PendingDecision
+
+def _get_travel_time(origin: str, destination: str) -> dict:
+    """Returns {duration_text: str, duration_seconds: int, mode: str}"""
+    key = os.environ.get("GOOGLE_MAPS_API_KEY", "")
+    if not key:
+        return {"duration_text": "~15 min", "duration_seconds": 900, "mode": "transit"}
+    url = "https://maps.googleapis.com/maps/api/directions/json"
+    params = {"origin": origin, "destination": destination,
+              "mode": "transit", "key": key}
+    try:
+        resp = httpx.get(url, params=params, timeout=5.0)
+        data = resp.json()
+        leg = data["routes"][0]["legs"][0]
+        return {
+            "duration_text": leg["duration"]["text"],
+            "duration_seconds": leg["duration"]["value"],
+            "mode": "transit",
+        }
+    except Exception:
+        return {"duration_text": "~15 min", "duration_seconds": 900, "mode": "transit"}
+
+def _gemini_meetup_proposal(buyer_location: str, seller_location: str,
+                             buyer_route: dict, final_price: float) -> dict:
+    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+    model = genai.GenerativeModel("gemini-2.0-flash")
+    prompt = (
+        f"Suggest a convenient public meetup location between '{buyer_location}' and "
+        f"'{seller_location}' in München (a Bahnhof, Marktplatz, or well-known landmark). "
+        f"Also suggest a time (weekday afternoon or weekend). "
+        f"Return JSON: {{\"location\": str, \"time_suggestion\": str, \"reason\": str}}"
+    )
+    text = model.generate_content(prompt).text.strip()
+    text = text.removeprefix("```json").removesuffix("```").strip()
+    return json.loads(text)
+
+def coordinate_node(state: ProcurementState) -> dict:
+    idx = state["current_candidate_index"]
+    listing = state["ranked_candidates"][idx]
+    final_price = state.get("final_price") or listing.get("price_eur", 0)
+    ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+    buyer_location = state["location"]
+    seller_location = listing.get("location_city") or listing.get("location", "München")
+
+    buyer_route = _get_travel_time(buyer_location, seller_location)
+    meetup_data = _gemini_meetup_proposal(
+        buyer_location, seller_location, buyer_route, final_price
+    )
+
+    meetup_proposal = {
+        "location": meetup_data["location"],
+        "time_suggestion": meetup_data["time_suggestion"],
+        "reason": meetup_data["reason"],
+        "buyer_route": buyer_route,
+        "seller_location": seller_location,
+        "final_price": final_price,
+    }
+
+    pending: PendingDecision = {
+        "checkpoint": "confirm_meetup",
+        "summary": (f"Meet at {meetup_data['location']} — "
+                    f"{meetup_data['time_suggestion']} ({buyer_route['duration_text']} away). Confirm?"),
+        "options": [
+            {"id": "confirm", "label": "Confirm meetup"},
+            {"id": "reschedule", "label": "Suggest different time"},
+            {"id": "cancel", "label": "Cancel"},
+        ],
+        "context": {"meetup_proposal": meetup_proposal},
+    }
+    choice = interrupt(pending)
+    decision_entry = {"checkpoint": "confirm_meetup", "choice": choice, "ts": ts}
+
+    if choice == "cancel":
+        return {
+            "status": "failed",
+            "decision_history": state["decision_history"] + [decision_entry],
+        }
+
+    return {
+        "meetup_proposal": meetup_proposal,
+        "confirmed": True,
+        "pending_decision": None,
+        "decision_history": state["decision_history"] + [decision_entry],
+        "status": "done",
+    }
