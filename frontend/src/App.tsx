@@ -9,6 +9,7 @@ import DoneScreen from './screens/DoneScreen'
 import AgentView from './admin/AgentView'
 import AuthScreen from './screens/AuthScreen'
 import SettingsScreen from './screens/SettingsScreen'
+import HistoryScreen from './screens/HistoryScreen'
 import { useSession } from './useSession'
 import { useAuth } from './auth/AuthProvider'
 
@@ -45,6 +46,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<BuyerFlow />} />
       <Route path="/settings" element={<SettingsScreen />} />
+      <Route path="/history" element={<HistoryScreen />} />
       <Route path="/admin" element={<AgentView />} />
     </Routes>
   )

@@ -108,6 +108,7 @@ def _on_state_committed(session_id: str, state: dict) -> None:
             "final_price": state.get("final_price"),
             "seller_label": "Kleinanzeigen",
             "meetup": state.get("meetup_proposal"),
+            "negotiation_thread": state.get("negotiation_thread") or [],
             "status": status,
         })
 
@@ -181,10 +182,12 @@ async def _start_telegram() -> None:
 
 
 @app.post("/session")
-async def create_session(req: SessionRequest):
+async def create_session(req: SessionRequest, authorization: str | None = Header(default=None)):
     session_id = str(uuid.uuid4())
     thread_id = session_id
-    _sessions[session_id] = {"thread_id": thread_id, "last_state": None}
+    token = authorization.removeprefix("Bearer ").strip() if authorization else None
+    user_id = user_id_for_token(token)
+    _sessions[session_id] = {"thread_id": thread_id, "last_state": None, "user_id": user_id}
 
     budget_max = req.budget_max if req.budget_max is not None else (req.budget or 200.0)
     state = initial_state(req.query, req.budget_min, budget_max,

@@ -31,9 +31,13 @@ def init_store() -> None:
                 meetup       TEXT,
                 status       TEXT,
                 created_at   TEXT,
-                closed_at    TEXT
+                closed_at    TEXT,
+                negotiation_thread TEXT
             )"""
         )
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(deals)").fetchall()]
+        if "negotiation_thread" not in cols:
+            conn.execute("ALTER TABLE deals ADD COLUMN negotiation_thread TEXT")
 
 
 def register_chat(chat_id: int, role: str, user_id: int | None = None) -> None:
@@ -69,20 +73,24 @@ def record_deal(deal: dict) -> None:
     with _connect() as conn:
         conn.execute(
             """INSERT INTO deals
-               (session_id, user_id, query, thumbnail, final_price, seller_label, meetup, status, created_at, closed_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               (session_id, user_id, query, thumbnail, final_price, seller_label, meetup, status,
+                created_at, closed_at, negotiation_thread)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(session_id) DO UPDATE SET
                  final_price=excluded.final_price, meetup=excluded.meetup,
-                 status=excluded.status, closed_at=excluded.closed_at""",
+                 status=excluded.status, closed_at=excluded.closed_at,
+                 negotiation_thread=excluded.negotiation_thread""",
             (deal["session_id"], deal.get("user_id"), deal.get("query"), deal.get("thumbnail"),
              deal.get("final_price"), deal.get("seller_label"),
-             json.dumps(deal.get("meetup") or {}), deal.get("status"), now, now),
+             json.dumps(deal.get("meetup") or {}), deal.get("status"), now, now,
+             json.dumps(deal.get("negotiation_thread") or [])),
         )
 
 
 def _row_to_deal(row: sqlite3.Row) -> dict:
     d = dict(row)
     d["meetup"] = json.loads(d.get("meetup") or "{}")
+    d["negotiation_thread"] = json.loads(d.get("negotiation_thread") or "[]")
     return d
 
 
