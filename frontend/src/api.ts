@@ -107,6 +107,31 @@ export interface MeetupProposal {
   final_price: number
 }
 
+export interface Deal {
+  session_id: string
+  query: string | null
+  thumbnail: string | null
+  final_price: number | null
+  seller_label: string | null
+  meetup: Partial<MeetupProposal> | Record<string, never>
+  status: string
+  created_at: string
+  closed_at: string
+  negotiation_thread: NegotiationMessage[]
+}
+
+export async function listDeals(): Promise<Deal[]> {
+  const r = await fetch(`${BASE}/deals`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to load history')
+  return r.json()
+}
+
+export async function getDeal(sessionId: string): Promise<Deal> {
+  const r = await fetch(`${BASE}/deals/${sessionId}`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to load deal')
+  return r.json()
+}
+
 export interface DecisionEntry {
   checkpoint: string
   choice: string
@@ -126,7 +151,7 @@ export async function createSession(params: {
 }): Promise<string> {
   const r = await fetch(`${BASE}/session`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(params),
   })
   const data = await r.json()
