@@ -23,7 +23,7 @@ from app.auth import (
 )
 from app.services import translate, identify_product, reverse_geocode, match_seeded_listing
 from app import store, gcal
-from app.telegram import notify_seller, notify_buyer, poll_updates
+from app.telegram import notify_seller, notify_seller_time, notify_buyer, poll_updates
 
 app = FastAPI(title="Envoy API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
@@ -91,8 +91,12 @@ class VisionRequest(BaseModel):
 def _on_state_committed(session_id: str, state: dict) -> None:
     """Side effects after a graph step commits: ping the seller / buyer over Telegram, record closed deals."""
     status = state.get("status")
-    if status == "awaiting_seller" and state.get("pending_decision", {}).get("checkpoint") == "seller_turn":
-        notify_seller(session_id, state["pending_decision"])
+    if status == "awaiting_seller":
+        cp = state.get("pending_decision", {}).get("checkpoint")
+        if cp == "seller_turn":
+            notify_seller(session_id, state["pending_decision"])
+        elif cp == "seller_time":
+            notify_seller_time(session_id, state["pending_decision"])
     elif status in ("awaiting_human", "coordinating", "done") and state.get("negotiation_thread"):
         last = state["negotiation_thread"][-1]
         thread_len = len(state["negotiation_thread"])
@@ -140,7 +144,7 @@ def _run_graph(thread_id: str, input_or_command, session_id: str):
             pending = interrupts[0].value
             state["pending_decision"] = pending
             state["status"] = ("awaiting_seller"
-                               if isinstance(pending, dict) and pending.get("checkpoint") == "seller_turn"
+                               if isinstance(pending, dict) and pending.get("checkpoint") in ("seller_turn", "seller_time")
                                else "awaiting_human")
 
         _sessions[session_id]["last_state"] = state
@@ -221,6 +225,24 @@ async def post_feedback(session_id: str, req: FeedbackRequest):
     await loop.run_in_executor(
         None, _run_graph, thread_id, Command(resume=req.choice), session_id
     )
+    return {"ok": True}
+
+
+class ProposeTimesRequest(BaseModel):
+    slots: list[str]
+
+
+@app.post("/session/{session_id}/propose-times")
+async def propose_times(session_id: str, req: ProposeTimesRequest):
+    if session_id not in _sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if not req.slots:
+        raise HTTPException(status_code=400, detail="At least one slot required")
+    thread_id = _sessions[session_id]["thread_id"]
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(
+        None, _run_graph, thread_id,
+        Command(resume={"action": "reschedule", "slots": req.slots}), session_id)
     return {"ok": True}
 
 
@@ -363,6 +385,13 @@ async def calendar_event(req: CalendarEventRequest, user_id: int = Depends(_requ
     if result is None:
         raise HTTPException(status_code=409, detail="Calendar not connected")
     return result
+
+
+@app.get("/calendar/freebusy")
+async def calendar_freebusy(time_min: str, time_max: str, user_id: int = Depends(_require_user)):
+    loop = asyncio.get_event_loop()
+    busy = await loop.run_in_executor(None, gcal.query_freebusy, user_id, time_min, time_max)
+    return {"busy": busy}
 
 
 @app.post("/translate")

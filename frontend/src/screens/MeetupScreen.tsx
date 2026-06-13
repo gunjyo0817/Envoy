@@ -2,14 +2,18 @@ import { useState, useEffect } from 'react'
 import type { SessionState, MeetupProposal } from '../api'
 import StepBar from '../components/StepBar'
 import CheckpointBanner from '../components/CheckpointBanner'
+import WeekPicker from '../components/WeekPicker'
+import { proposeTimes } from '../api'
 
 interface Props {
   state: SessionState
   onFeedback: (choice: string) => Promise<void>
+  sessionId: string
 }
 
-export default function MeetupScreen({ state, onFeedback }: Props) {
+export default function MeetupScreen({ state, onFeedback, sessionId }: Props) {
   const [loading, setLoading] = useState(false)
+  const [picking, setPicking] = useState(false)
   const decision = state.pending_decision!
   const proposal = (decision.context?.meetup_proposal ?? state.meetup_proposal) as MeetupProposal | undefined
   const agreedPrice = proposal?.final_price ?? state.final_price
@@ -20,6 +24,7 @@ export default function MeetupScreen({ state, onFeedback }: Props) {
   }, [decision?.summary])
 
   const handleChoice = async (choice: string) => {
+    if (choice === 'reschedule') { setPicking(true); return }
     setLoading(true)
     await onFeedback(choice)
   }
@@ -120,12 +125,19 @@ export default function MeetupScreen({ state, onFeedback }: Props) {
           <div className="flex-1" />
 
           <div className="mt-7">
-            <CheckpointBanner
-              decision={decision}
-              onChoice={handleChoice}
-              loading={loading}
-              eyebrow="Final step"
-            />
+            {picking ? (
+              <WeekPicker
+                onCancel={() => setPicking(false)}
+                onSend={async (slots) => { setPicking(false); setLoading(true); await proposeTimes(sessionId, slots) }}
+              />
+            ) : (
+              <CheckpointBanner
+                decision={decision}
+                onChoice={handleChoice}
+                loading={loading}
+                eyebrow="Final step"
+              />
+            )}
           </div>
         </div>
       </div>

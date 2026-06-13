@@ -50,6 +50,22 @@ def notify_seller(session_id: str, pending: dict) -> None:
     tg_send(chat_id, text, buttons)
 
 
+def build_seller_time_message(pending: dict) -> tuple[str, list[tuple[str, str]]]:
+    slots = pending["context"]["slots"]
+    text = pending["summary"] + "\n\n" + "\n".join(f"{i+1}. {s}" for i, s in enumerate(slots))
+    buttons = [(f"{i+1}. {s}", f"time:{i}") for i, s in enumerate(slots)]
+    return text, buttons
+
+
+def notify_seller_time(session_id: str, pending: dict) -> None:
+    chat_id = store.chat_for_role("seller")
+    if chat_id is None:
+        return
+    store.attach_session(chat_id, session_id)
+    text, buttons = build_seller_time_message(pending)
+    tg_send(chat_id, text, buttons)
+
+
 def notify_buyer(session_id: str, message: str) -> None:
     chat_id = store.chat_for_role("buyer")
     if chat_id is None:
@@ -88,12 +104,14 @@ async def _dispatch(upd: dict, on_seller_reply) -> None:
         store.register_chat(chat_id, role)
         tg_send(chat_id, f"Registered as {role}. You'll get negotiation updates here.")
         return
-    # inline button tap: "seller:accept" | "seller:counter" | "seller:reject"
+    # inline button tap: "seller:accept" | "seller:counter" | "seller:reject" | "time:N"
     cb = upd.get("callback_query")
-    if cb and cb.get("data", "").startswith("seller:"):
+    if cb and (cb.get("data", "").startswith("seller:") or cb.get("data", "").startswith("time:")):
         chat_id = cb["message"]["chat"]["id"]
         link = store.resolve_chat(chat_id)
         if not link or not link.get("session_id"):
             return
-        choice = cb["data"].split(":", 1)[1]
+        data = cb["data"]
+        choice = data.split(":", 1)[1] if data.startswith("seller:") else data  # keep "time:N" intact
         await on_seller_reply(link["session_id"], choice)
+        return

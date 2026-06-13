@@ -29,7 +29,7 @@ function BuyerFlow() {
     const cp = state?.pending_decision?.checkpoint
     if (cp === 'confirm_candidate') return <ChooseScreen state={state} onFeedback={sendFeedback} />
     if (cp === 'confirm_offer') return <NegotiateScreen state={state} onFeedback={sendFeedback} />
-    if (cp === 'confirm_meetup') return <MeetupScreen state={state} onFeedback={sendFeedback} />
+    if (cp === 'confirm_meetup') return <MeetupScreen state={state} onFeedback={sendFeedback} sessionId={sessionId!} />
   }
   if (status === 'awaiting_seller') {
     return <ProcessingScreen status={status} />

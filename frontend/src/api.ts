@@ -259,6 +259,20 @@ export async function postFeedback(
   })
 }
 
+export async function getFreebusy(timeMin: string, timeMax: string): Promise<{ busy: { start: string; end: string }[] }> {
+  const r = await fetch(`${BASE}/calendar/freebusy?time_min=${encodeURIComponent(timeMin)}&time_max=${encodeURIComponent(timeMax)}`,
+    { headers: { ...authHeaders() } })
+  if (!r.ok) return { busy: [] }
+  return r.json()
+}
+
+export async function proposeTimes(sessionId: string, slots: string[]): Promise<void> {
+  await fetch(`${BASE}/session/${sessionId}/propose-times`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ slots }),
+  })
+}
+
 export async function translateText(text: string, targetLang: string): Promise<string> {
   const r = await fetch(`${BASE}/translate`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -8,7 +8,7 @@ from app.agents.negotiate import (
     make_offer_node, decide_offer_node, seller_turn_node,
     make_counter_node, decide_counter_node,
 )
-from app.agents.coordinate import plan_meetup_node, confirm_meetup_node
+from app.agents.coordinate import plan_meetup_node, confirm_meetup_node, seller_time_turn_node
 
 
 def _after_confirm(state: ProcurementState) -> str:
@@ -47,11 +47,17 @@ def _after_decide_counter(state: ProcurementState) -> str:
 
 
 def _after_confirm_meetup(state: ProcurementState) -> str:
+    if state["status"] == "awaiting_seller":
+        return "seller_time_turn"
     if state["status"] == "done":
         return END
     if state["status"] == "failed":
         return END
-    return "plan_meetup"  # reschedule
+    return "plan_meetup"  # plain reschedule
+
+
+def _after_seller_time_turn(state: ProcurementState) -> str:
+    return "confirm_meetup"
 
 
 def build_graph() -> tuple:
@@ -67,6 +73,7 @@ def build_graph() -> tuple:
     builder.add_node("decide_counter", decide_counter_node)
     builder.add_node("plan_meetup", plan_meetup_node)
     builder.add_node("confirm_meetup", confirm_meetup_node)
+    builder.add_node("seller_time_turn", seller_time_turn_node)
 
     builder.set_entry_point("search")
     builder.add_edge("search", "extract")
@@ -103,8 +110,9 @@ def build_graph() -> tuple:
     builder.add_conditional_edges(
         "confirm_meetup",
         _after_confirm_meetup,
-        {"plan_meetup": "plan_meetup", END: END},
+        {"seller_time_turn": "seller_time_turn", "plan_meetup": "plan_meetup", END: END},
     )
+    builder.add_edge("seller_time_turn", "confirm_meetup")
 
     # All three human checkpoints use dynamic interrupt() inside their nodes,
     # so no static interrupt_before is needed — resume is uniformly
