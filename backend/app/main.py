@@ -22,11 +22,14 @@ from app.auth import (
     find_or_create_google_user, public_user_for_token,
 )
 from app.services import translate, identify_product, reverse_geocode
+from app import store
+from app.telegram import notify_seller, notify_buyer, poll_updates
 
 app = FastAPI(title="Envoy API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["*"], allow_headers=["*"])
 init_db()
+store.init_store()
 
 _sessions: dict[str, dict] = {}   # session_id → {thread_id, last_state}
 
@@ -72,6 +75,34 @@ class VisionRequest(BaseModel):
     image_base64: str
 
 
+def _on_state_committed(session_id: str, state: dict) -> None:
+    """Side effects after a graph step commits: ping the seller / buyer over Telegram, record closed deals."""
+    status = state.get("status")
+    if status == "awaiting_seller" and state.get("pending_decision", {}).get("checkpoint") == "seller_turn":
+        notify_seller(session_id, state["pending_decision"])
+    elif status in ("awaiting_human", "coordinating", "done") and state.get("negotiation_thread"):
+        last = state["negotiation_thread"][-1]
+        if last["role"] == "seller":
+            verb = {"accept": "accepted your offer", "counter_offer": "sent a counter-offer",
+                    "reject": "declined"}.get(last["act"], "replied")
+            notify_buyer(session_id, f"Seller {verb} — review ▸")
+
+    if status in ("done", "failed"):
+        candidates = state.get("ranked_candidates") or []
+        idx = state.get("current_candidate_index", 0)
+        listing = candidates[idx] if 0 <= idx < len(candidates) else {}
+        store.record_deal({
+            "session_id": session_id,
+            "user_id": _sessions.get(session_id, {}).get("user_id"),
+            "query": state.get("query"),
+            "thumbnail": listing.get("image_url"),
+            "final_price": state.get("final_price"),
+            "seller_label": "Kleinanzeigen",
+            "meetup": state.get("meetup_proposal"),
+            "status": status,
+        })
+
+
 def _run_graph(thread_id: str, input_or_command, session_id: str):
     graph = get_graph()
     config = {"configurable": {"thread_id": thread_id}}
@@ -87,6 +118,7 @@ def _run_graph(thread_id: str, input_or_command, session_id: str):
         state["status"] = "awaiting_human"
 
     _sessions[session_id]["last_state"] = state
+    _on_state_committed(session_id, state)
     agent_name = {
         "searching": "search", "reviewing": "extract",
         "awaiting_human": "analyst", "negotiating": "negotiate",
@@ -114,6 +146,19 @@ def _run_graph(thread_id: str, input_or_command, session_id: str):
         pass  # No event loop available (e.g. in tests without async context)
 
     return state
+
+
+async def _resume_seller(session_id: str, choice: str) -> None:
+    if session_id not in _sessions:
+        return
+    thread_id = _sessions[session_id]["thread_id"]
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _run_graph, thread_id, Command(resume=choice), session_id)
+
+
+@app.on_event("startup")
+async def _start_telegram() -> None:
+    asyncio.create_task(poll_updates(_resume_seller))
 
 
 @app.post("/session")
