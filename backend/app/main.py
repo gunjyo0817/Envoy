@@ -1,4 +1,4 @@
-import uuid, asyncio, os, urllib.parse
+import uuid, asyncio, os, urllib.parse, threading
 import httpx
 from dotenv import load_dotenv
 load_dotenv()
@@ -32,6 +32,11 @@ init_db()
 store.init_store()
 
 _sessions: dict[str, dict] = {}   # session_id → {thread_id, last_state}
+_session_locks: dict[str, threading.Lock] = {}
+
+
+def _lock_for(session_id: str) -> threading.Lock:
+    return _session_locks.setdefault(session_id, threading.Lock())
 
 
 class SessionRequest(BaseModel):
@@ -82,10 +87,14 @@ def _on_state_committed(session_id: str, state: dict) -> None:
         notify_seller(session_id, state["pending_decision"])
     elif status in ("awaiting_human", "coordinating", "done") and state.get("negotiation_thread"):
         last = state["negotiation_thread"][-1]
-        if last["role"] == "seller":
+        thread_len = len(state["negotiation_thread"])
+        last_notified_len = _sessions.get(session_id, {}).get("last_notified_len", 0)
+        if last["role"] == "seller" and thread_len > last_notified_len:
             verb = {"accept": "accepted your offer", "counter_offer": "sent a counter-offer",
                     "reject": "declined"}.get(last["act"], "replied")
             notify_buyer(session_id, f"Seller {verb} — review ▸")
+            if session_id in _sessions:
+                _sessions[session_id]["last_notified_len"] = thread_len
 
     if status in ("done", "failed"):
         candidates = state.get("ranked_candidates") or []
@@ -106,22 +115,32 @@ def _on_state_committed(session_id: str, state: dict) -> None:
 def _run_graph(thread_id: str, input_or_command, session_id: str):
     graph = get_graph()
     config = {"configurable": {"thread_id": thread_id}}
-    state = dict(graph.invoke(input_or_command, config=config))
+    # Hold a per-session lock across the graph invoke + commit. Both the buyer
+    # /feedback handler and the Telegram _resume_seller task can call _run_graph
+    # on the same thread_id; concurrent graph.invoke calls would corrupt the
+    # MemorySaver checkpoint for that thread.
+    with _lock_for(session_id):
+        state = dict(graph.invoke(input_or_command, config=config))
 
-    # Dynamic interrupt() stores its payload in the non-serializable
-    # __interrupt__ channel, not in state["pending_decision"]. Bridge it so the
-    # frontend (which polls pending_decision) sees the checkpoint, and drop the
-    # raw Interrupt object so GET /state stays JSON-serializable.
-    interrupts = state.pop("__interrupt__", None)
-    if interrupts:
-        state["pending_decision"] = interrupts[0].value
-        state["status"] = "awaiting_human"
+        # Dynamic interrupt() stores its payload in the non-serializable
+        # __interrupt__ channel, not in state["pending_decision"]. Bridge it so the
+        # frontend (which polls pending_decision) sees the checkpoint, and drop the
+        # raw Interrupt object so GET /state stays JSON-serializable.
+        interrupts = state.pop("__interrupt__", None)
+        if interrupts:
+            pending = interrupts[0].value
+            state["pending_decision"] = pending
+            state["status"] = ("awaiting_seller"
+                               if isinstance(pending, dict) and pending.get("checkpoint") == "seller_turn"
+                               else "awaiting_human")
 
-    _sessions[session_id]["last_state"] = state
-    _on_state_committed(session_id, state)
+        _sessions[session_id]["last_state"] = state
+        _on_state_committed(session_id, state)
+
     agent_name = {
         "searching": "search", "reviewing": "extract",
-        "awaiting_human": "analyst", "negotiating": "negotiate",
+        "awaiting_human": "analyst", "awaiting_seller": "negotiate",
+        "negotiating": "negotiate",
         "coordinating": "coordinate", "done": "coordinate", "failed": "orchestrator",
     }.get(state.get("status", ""), "orchestrator")
 

@@ -1,7 +1,9 @@
 """Telegram transport via raw httpx getUpdates long-polling. No external bot lib."""
-import os, asyncio
+import os, asyncio, logging
 import httpx
 from app import store
+
+logger = logging.getLogger("envoy.telegram")
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
@@ -22,7 +24,7 @@ def tg_send(chat_id: int, text: str, buttons: list[tuple[str, str]] | None = Non
     try:
         httpx.post(_api("sendMessage"), json=payload, timeout=10.0)
     except Exception:
-        pass
+        logger.warning("telegram send failed", exc_info=True)
 
 
 def build_seller_message(pending: dict) -> tuple[str, list[tuple[str, str]]]:
@@ -72,6 +74,7 @@ async def poll_updates(on_seller_reply) -> None:
                     offset = upd["update_id"] + 1
                     await _dispatch(upd, on_seller_reply)
             except Exception:
+                logger.warning("telegram poll error", exc_info=True)
                 await asyncio.sleep(2.0)
 
 
