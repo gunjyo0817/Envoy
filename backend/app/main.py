@@ -13,6 +13,7 @@ from app.sessions import register_ws, unregister_ws, broadcast, get_logs
 from app.auth import (
     init_db, signup, login, user_id_for_token, get_settings, update_settings, AuthError,
 )
+from app.services import translate, identify_product
 
 app = FastAPI(title="BuyBot API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
@@ -51,6 +52,15 @@ class LoginRequest(BaseModel):
 class SettingsRequest(BaseModel):
     language: str | None = None
     default_address: str | None = None
+
+
+class TranslateRequest(BaseModel):
+    text: str
+    target_lang: str = "en"
+
+
+class VisionRequest(BaseModel):
+    image_base64: str
 
 
 def _run_graph(thread_id: str, input_or_command, session_id: str):
@@ -172,6 +182,23 @@ async def read_settings(user_id: int = Depends(_require_user)):
 @app.put("/settings")
 async def write_settings(req: SettingsRequest, user_id: int = Depends(_require_user)):
     return update_settings(user_id, req.language, req.default_address)
+
+
+@app.post("/translate")
+async def translate_text(req: TranslateRequest):
+    loop = asyncio.get_event_loop()
+    translation = await loop.run_in_executor(None, translate, req.text, req.target_lang)
+    return {"translation": translation}
+
+
+@app.post("/vision/identify")
+async def vision_identify(req: VisionRequest):
+    loop = asyncio.get_event_loop()
+    try:
+        query = await loop.run_in_executor(None, identify_product, req.image_base64)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"query": query}
 
 
 @app.websocket("/session/{session_id}/stream")
