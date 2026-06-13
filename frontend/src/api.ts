@@ -29,6 +29,24 @@ export async function login(email: string, password: string): Promise<AuthResult
   return r.json()
 }
 
+export interface UserSettings { language: string; default_address: string }
+
+export async function getSettings(): Promise<UserSettings> {
+  const r = await fetch(`${BASE}/settings`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to load settings')
+  return r.json()
+}
+
+export async function updateSettings(patch: Partial<UserSettings>): Promise<UserSettings> {
+  const r = await fetch(`${BASE}/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(patch),
+  })
+  if (!r.ok) throw new Error('Failed to save settings')
+  return r.json()
+}
+
 export interface SessionState {
   query?: string
   budget?: number

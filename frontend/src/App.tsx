@@ -8,6 +8,7 @@ import MeetupScreen from './screens/MeetupScreen'
 import DoneScreen from './screens/DoneScreen'
 import AgentView from './admin/AgentView'
 import AuthScreen from './screens/AuthScreen'
+import SettingsScreen from './screens/SettingsScreen'
 import { useSession } from './useSession'
 import { useAuth } from './auth/AuthProvider'
 
@@ -40,6 +41,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<BuyerFlow />} />
+      <Route path="/settings" element={<SettingsScreen />} />
       <Route path="/admin" element={<AgentView />} />
     </Routes>
   )

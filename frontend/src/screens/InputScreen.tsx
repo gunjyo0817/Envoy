@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { createSession } from '../api'
 import { useI18n } from '../i18n/I18nProvider'
+import { useAuth } from '../auth/AuthProvider'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 
 interface Props {
@@ -19,10 +21,12 @@ const AGENTS = ['Search', 'Extract', 'Analyst', 'Negotiate', 'Coordinate']
 
 export default function InputScreen({ onStart }: Props) {
   const { t } = useI18n()
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [budget, setBudget] = useState(200)
   const [condition, setCondition] = useState('good+')
-  const [location, setLocation] = useState('München')
+  const [location, setLocation] = useState(user?.default_address || 'München')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -88,6 +92,17 @@ export default function InputScreen({ onStart }: Props) {
               Agents ready
             </span>
             <LanguageSwitcher />
+            <button
+              type="button"
+              aria-label="Settings"
+              onClick={() => navigate('/settings')}
+              className="grid place-items-center h-8 w-8 rounded-lg text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-[var(--color-surface-raised)] transition-colors cursor-pointer"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+              </svg>
+            </button>
           </div>
         </header>
 
