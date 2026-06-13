@@ -4,6 +4,11 @@ import google.generativeai as genai
 from langgraph.types import interrupt
 from app.state import ProcurementState, PendingDecision
 
+
+def _ts() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
 def _get_travel_time(origin: str, destination: str) -> dict:
     """Returns {duration_text: str, duration_seconds: int, mode: str}"""
     key = os.environ.get("GOOGLE_MAPS_API_KEY", "")
@@ -92,6 +97,19 @@ def confirm_meetup_node(state: ProcurementState) -> dict:
     already-committed proposal and pending decision from state.
     """
     choice = interrupt(state["pending_decision"])
+    if isinstance(choice, dict) and choice.get("action") == "reschedule":
+        slots = choice.get("slots") or []
+        pending = {
+            "checkpoint": "seller_time",
+            "summary": f"Buyer proposes {len(slots)} time(s) to meet. Pick one.",
+            "options": [{"id": f"time:{i}", "label": s} for i, s in enumerate(slots)],
+            "context": {"slots": slots},
+        }
+        return {
+            "pending_decision": pending, "status": "awaiting_seller",
+            "decision_history": state["decision_history"]
+                + [{"checkpoint": "confirm_meetup", "choice": "reschedule", "ts": _ts()}],
+        }
     ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
     decision_entry = {"checkpoint": "confirm_meetup", "choice": choice, "ts": ts}
     if choice == "cancel":
@@ -114,4 +132,35 @@ def confirm_meetup_node(state: ProcurementState) -> dict:
         "pending_decision": None,
         "decision_history": state["decision_history"] + [decision_entry],
         "status": "done",
+    }
+
+
+def seller_time_turn_node(state: ProcurementState) -> dict:
+    """Seller picks one of the buyer's proposed slots (Telegram); re-confirm to buyer."""
+    pending = state["pending_decision"]
+    slots = pending["context"]["slots"]
+    choice = interrupt(pending)            # "time:<index>"
+    idx = 0
+    if isinstance(choice, str) and choice.startswith("time:"):
+        try:
+            idx = int(choice.split(":", 1)[1])
+        except ValueError:
+            idx = 0
+    chosen = slots[idx] if 0 <= idx < len(slots) else (slots[0] if slots else None)
+    proposal = {**state["meetup_proposal"], "time_suggestion": chosen}
+    confirm_pending = {
+        "checkpoint": "confirm_meetup",
+        "summary": f"Seller agreed to {chosen}. Confirm the meetup?",
+        "options": [
+            {"id": "confirm", "label": "Confirm meetup"},
+            {"id": "reschedule", "label": "Suggest different time"},
+            {"id": "cancel", "label": "Cancel"},
+        ],
+        "context": {"meetup_proposal": proposal},
+    }
+    return {
+        "meetup_proposal": proposal, "pending_decision": confirm_pending,
+        "status": "awaiting_human",
+        "decision_history": state["decision_history"]
+            + [{"checkpoint": "seller_time", "choice": choice, "ts": _ts()}],
     }
