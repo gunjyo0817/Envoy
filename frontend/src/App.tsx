@@ -1,3 +1,42 @@
+import { useState } from 'react'
+import { Routes, Route } from 'react-router-dom'
+import InputScreen from './screens/InputScreen'
+import ProcessingScreen from './screens/ProcessingScreen'
+import ChooseScreen from './screens/ChooseScreen'
+import NegotiateScreen from './screens/NegotiateScreen'
+import MeetupScreen from './screens/MeetupScreen'
+import DoneScreen from './screens/DoneScreen'
+import AgentView from './admin/AgentView'
+import { useSession } from './useSession'
+
+function BuyerFlow() {
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const { state, sendFeedback } = useSession(sessionId)
+
+  if (!sessionId) return <InputScreen onStart={setSessionId} />
+
+  const status = state?.status
+  if (!status || status === 'searching' || status === 'reviewing') {
+    return <ProcessingScreen status={status} />
+  }
+  if (status === 'awaiting_human') {
+    const cp = state?.pending_decision?.checkpoint
+    if (cp === 'confirm_candidate') return <ChooseScreen state={state} onFeedback={sendFeedback} />
+    if (cp === 'confirm_offer') return <NegotiateScreen state={state} onFeedback={sendFeedback} />
+    if (cp === 'confirm_meetup') return <MeetupScreen state={state} onFeedback={sendFeedback} />
+  }
+  if (status === 'negotiating' || status === 'coordinating') {
+    return <ProcessingScreen status={status} />
+  }
+  if (status === 'done') return <DoneScreen state={state} />
+  return <ProcessingScreen status={status} />
+}
+
 export default function App() {
-  return <div className="min-h-screen bg-slate-900 text-white p-8">BuyBot loading...</div>
+  return (
+    <Routes>
+      <Route path="/" element={<BuyerFlow />} />
+      <Route path="/admin" element={<AgentView />} />
+    </Routes>
+  )
 }

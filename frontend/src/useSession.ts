@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { getState, postFeedback, connectWS, SessionState, WsEvent } from './api'
+import { getState, postFeedback, connectWS } from './api'
+import type { SessionState, WsEvent } from './api'
 
 export interface AgentLogEntry {
   agent: string
