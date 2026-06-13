@@ -177,6 +177,18 @@ export default function InputScreen({ onStart }: Props) {
             <LanguageSwitcher />
             <button
               type="button"
+              aria-label="History"
+              onClick={() => navigate('/history')}
+              className="grid place-items-center h-8 w-8 rounded-lg text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-[var(--color-surface-raised)] transition-colors cursor-pointer"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M3 3v5h5" />
+                <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+                <path d="M12 7v5l4 2" />
+              </svg>
+            </button>
+            <button
+              type="button"
               aria-label="Settings"
               onClick={() => navigate('/settings')}
               className="grid place-items-center h-8 w-8 rounded-lg text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-[var(--color-surface-raised)] transition-colors cursor-pointer"
