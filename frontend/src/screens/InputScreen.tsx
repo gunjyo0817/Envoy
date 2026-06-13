@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createSession, identifyImage } from '../api'
+import { createSession, identifyImage, reverseGeocode } from '../api'
 import { useI18n } from '../i18n/I18nProvider'
 import { useAuth } from '../auth/AuthProvider'
 import LanguageSwitcher from '../components/LanguageSwitcher'
@@ -21,7 +21,7 @@ const CONDITIONS: { value: string; label: string }[] = [
 const AGENTS = ['Search', 'Extract', 'Analyst', 'Negotiate', 'Coordinate']
 
 export default function InputScreen({ onStart }: Props) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
@@ -52,6 +52,7 @@ export default function InputScreen({ onStart }: Props) {
         condition,
         location: location.trim() || 'München',
         max_distance_km: 15,
+        language: lang,
       })
       onStart(id)
     } catch {
@@ -106,11 +107,19 @@ export default function InputScreen({ onStart }: Props) {
     }
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const { latitude, longitude } = pos.coords
-        setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
-        setLocationHint('Using current location')
-        setLocating(false)
+        try {
+          // Resolve coordinates to a human-readable place name.
+          const place = await reverseGeocode(latitude, longitude)
+          setLocation(place || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+          setLocationHint(place ? `Using ${place}` : 'Using current location')
+        } catch {
+          setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+          setLocationHint('Using current location')
+        } finally {
+          setLocating(false)
+        }
       },
       () => {
         setError("Couldn't get your location — enter your city manually.")

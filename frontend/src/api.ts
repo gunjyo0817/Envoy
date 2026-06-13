@@ -122,7 +122,7 @@ export interface WsEvent {
 
 export async function createSession(params: {
   query: string; budget_min: number; budget_max: number; condition: string;
-  location: string; max_distance_km: number
+  location: string; max_distance_km: number; language?: string
 }): Promise<string> {
   const r = await fetch(`${BASE}/session`, {
     method: 'POST',
@@ -131,6 +131,13 @@ export async function createSession(params: {
   })
   const data = await r.json()
   return data.session_id
+}
+
+export async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const r = await fetch(`${BASE}/geocode/reverse?lat=${lat}&lng=${lng}`)
+  if (!r.ok) throw new Error('Could not resolve location')
+  const data = await r.json()
+  return data.location ?? ''
 }
 
 export async function identifyImage(imageBase64: string): Promise<string> {
