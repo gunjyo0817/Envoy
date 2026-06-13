@@ -2,6 +2,7 @@
 import os, base64, binascii
 import httpx
 import google.generativeai as genai
+from app.mock.listings import SEEDED_DEMO_LISTING
 
 _LANG_NAME = {"en": "English", "de": "German"}
 
@@ -86,3 +87,11 @@ def reverse_geocode(lat: float, lng: float) -> str:
     except Exception:
         pass
     return fallback
+
+
+def match_seeded_listing(query: str) -> dict | None:
+    """Match a product query against the seeded demo listing by keyword overlap."""
+    q = (query or "").lower()
+    kws = SEEDED_DEMO_LISTING["match_keywords"]
+    hits = sum(1 for kw in kws if kw in q)
+    return SEEDED_DEMO_LISTING if hits >= max(2, len(kws) - 1) else None

@@ -1,4 +1,4 @@
-import uuid, asyncio, os, urllib.parse
+import uuid, asyncio, os, urllib.parse, threading
 import httpx
 from dotenv import load_dotenv
 load_dotenv()
@@ -21,14 +21,22 @@ from app.auth import (
     init_db, signup, login, user_id_for_token, get_settings, update_settings, AuthError,
     find_or_create_google_user, public_user_for_token,
 )
-from app.services import translate, identify_product, reverse_geocode
+from app.services import translate, identify_product, reverse_geocode, match_seeded_listing
+from app import store
+from app.telegram import notify_seller, notify_buyer, poll_updates
 
 app = FastAPI(title="Envoy API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
                    allow_methods=["*"], allow_headers=["*"])
 init_db()
+store.init_store()
 
 _sessions: dict[str, dict] = {}   # session_id → {thread_id, last_state}
+_session_locks: dict[str, threading.Lock] = {}
+
+
+def _lock_for(session_id: str) -> threading.Lock:
+    return _session_locks.setdefault(session_id, threading.Lock())
 
 
 class SessionRequest(BaseModel):
@@ -72,24 +80,67 @@ class VisionRequest(BaseModel):
     image_base64: str
 
 
+def _on_state_committed(session_id: str, state: dict) -> None:
+    """Side effects after a graph step commits: ping the seller / buyer over Telegram, record closed deals."""
+    status = state.get("status")
+    if status == "awaiting_seller" and state.get("pending_decision", {}).get("checkpoint") == "seller_turn":
+        notify_seller(session_id, state["pending_decision"])
+    elif status in ("awaiting_human", "coordinating", "done") and state.get("negotiation_thread"):
+        last = state["negotiation_thread"][-1]
+        thread_len = len(state["negotiation_thread"])
+        last_notified_len = _sessions.get(session_id, {}).get("last_notified_len", 0)
+        if last["role"] == "seller" and thread_len > last_notified_len:
+            verb = {"accept": "accepted your offer", "counter_offer": "sent a counter-offer",
+                    "reject": "declined"}.get(last["act"], "replied")
+            notify_buyer(session_id, f"Seller {verb} — review ▸")
+            if session_id in _sessions:
+                _sessions[session_id]["last_notified_len"] = thread_len
+
+    if status in ("done", "failed"):
+        candidates = state.get("ranked_candidates") or []
+        idx = state.get("current_candidate_index", 0)
+        listing = candidates[idx] if 0 <= idx < len(candidates) else {}
+        store.record_deal({
+            "session_id": session_id,
+            "user_id": _sessions.get(session_id, {}).get("user_id"),
+            "query": state.get("query"),
+            "thumbnail": listing.get("image_url"),
+            "final_price": state.get("final_price"),
+            "seller_label": "Kleinanzeigen",
+            "meetup": state.get("meetup_proposal"),
+            "status": status,
+        })
+
+
 def _run_graph(thread_id: str, input_or_command, session_id: str):
     graph = get_graph()
     config = {"configurable": {"thread_id": thread_id}}
-    state = dict(graph.invoke(input_or_command, config=config))
+    # Hold a per-session lock across the graph invoke + commit. Both the buyer
+    # /feedback handler and the Telegram _resume_seller task can call _run_graph
+    # on the same thread_id; concurrent graph.invoke calls would corrupt the
+    # MemorySaver checkpoint for that thread.
+    with _lock_for(session_id):
+        state = dict(graph.invoke(input_or_command, config=config))
 
-    # Dynamic interrupt() stores its payload in the non-serializable
-    # __interrupt__ channel, not in state["pending_decision"]. Bridge it so the
-    # frontend (which polls pending_decision) sees the checkpoint, and drop the
-    # raw Interrupt object so GET /state stays JSON-serializable.
-    interrupts = state.pop("__interrupt__", None)
-    if interrupts:
-        state["pending_decision"] = interrupts[0].value
-        state["status"] = "awaiting_human"
+        # Dynamic interrupt() stores its payload in the non-serializable
+        # __interrupt__ channel, not in state["pending_decision"]. Bridge it so the
+        # frontend (which polls pending_decision) sees the checkpoint, and drop the
+        # raw Interrupt object so GET /state stays JSON-serializable.
+        interrupts = state.pop("__interrupt__", None)
+        if interrupts:
+            pending = interrupts[0].value
+            state["pending_decision"] = pending
+            state["status"] = ("awaiting_seller"
+                               if isinstance(pending, dict) and pending.get("checkpoint") == "seller_turn"
+                               else "awaiting_human")
 
-    _sessions[session_id]["last_state"] = state
+        _sessions[session_id]["last_state"] = state
+        _on_state_committed(session_id, state)
+
     agent_name = {
         "searching": "search", "reviewing": "extract",
-        "awaiting_human": "analyst", "negotiating": "negotiate",
+        "awaiting_human": "analyst", "awaiting_seller": "negotiate",
+        "negotiating": "negotiate",
         "coordinating": "coordinate", "done": "coordinate", "failed": "orchestrator",
     }.get(state.get("status", ""), "orchestrator")
 
@@ -114,6 +165,19 @@ def _run_graph(thread_id: str, input_or_command, session_id: str):
         pass  # No event loop available (e.g. in tests without async context)
 
     return state
+
+
+async def _resume_seller(session_id: str, choice: str) -> None:
+    if session_id not in _sessions:
+        return
+    thread_id = _sessions[session_id]["thread_id"]
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _run_graph, thread_id, Command(resume=choice), session_id)
+
+
+@app.on_event("startup")
+async def _start_telegram() -> None:
+    asyncio.create_task(poll_updates(_resume_seller))
 
 
 @app.post("/session")
@@ -240,6 +304,19 @@ async def write_settings(req: SettingsRequest, user_id: int = Depends(_require_u
     return update_settings(user_id, req.language, req.default_address)
 
 
+@app.get("/deals")
+async def read_deals(user_id: int = Depends(_require_user)):
+    return store.list_deals(user_id)
+
+
+@app.get("/deals/{session_id}")
+async def read_deal(session_id: str, user_id: int = Depends(_require_user)):
+    deal = store.get_deal(session_id)
+    if not deal or deal.get("user_id") != user_id:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    return deal
+
+
 @app.post("/translate")
 async def translate_text(req: TranslateRequest):
     loop = asyncio.get_event_loop()
@@ -264,6 +341,17 @@ async def vision_identify(req: VisionRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"query": query}
+
+
+@app.post("/vision/search")
+async def vision_search(req: VisionRequest):
+    loop = asyncio.get_event_loop()
+    try:
+        query = await loop.run_in_executor(None, identify_product, req.image_base64)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    match = await loop.run_in_executor(None, match_seeded_listing, query)
+    return {"query": query, "matched_listing": match}
 
 
 @app.websocket("/session/{session_id}/stream")

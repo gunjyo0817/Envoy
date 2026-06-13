@@ -51,6 +51,17 @@ const PHASES: Record<string, Phase> = {
       </svg>
     ),
   },
+  awaiting_seller: {
+    title: 'Waiting for the seller to respond…',
+    sub: 'Your offer is with the seller. We’ll let you know the moment they reply.',
+    steps: ['Offer delivered', 'Waiting for the seller', 'Watching for a reply'],
+    icon: (
+      <svg {...ICON_PROPS} aria-hidden>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 3" />
+      </svg>
+    ),
+  },
   coordinating: {
     title: 'Arranging the meetup',
     sub: 'Finding a convenient public spot and a time that works for both.',

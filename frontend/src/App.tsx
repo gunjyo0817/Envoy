@@ -30,6 +30,9 @@ function BuyerFlow() {
     if (cp === 'confirm_offer') return <NegotiateScreen state={state} onFeedback={sendFeedback} />
     if (cp === 'confirm_meetup') return <MeetupScreen state={state} onFeedback={sendFeedback} />
   }
+  if (status === 'awaiting_seller') {
+    return <ProcessingScreen status={status} />
+  }
   if (status === 'negotiating' || status === 'coordinating') {
     return <ProcessingScreen status={status} />
   }

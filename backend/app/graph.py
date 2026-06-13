@@ -5,7 +5,8 @@ from app.agents.search import search_node
 from app.agents.extract import extract_node
 from app.agents.analyst import analyst_node, confirm_candidate_node
 from app.agents.negotiate import (
-    make_offer_node, decide_offer_node, make_counter_node, decide_counter_node,
+    make_offer_node, decide_offer_node, seller_turn_node,
+    make_counter_node, decide_counter_node,
 )
 from app.agents.coordinate import plan_meetup_node, confirm_meetup_node
 
@@ -21,16 +22,22 @@ def _after_make_offer(state: ProcurementState) -> str:
 
 
 def _after_decide_offer(state: ProcurementState) -> str:
+    if state["status"] == "awaiting_seller":
+        return "seller_turn"
+    if state["status"] == "failed":
+        return END
+    return "make_offer"  # skip → next candidate
+
+
+def _after_seller_turn(state: ProcurementState) -> str:
     if state["status"] == "coordinating":
         return "plan_meetup"
     if state["status"] == "failed":
         return END
     thread = state.get("negotiation_thread") or []
-    # Seller still negotiating (counter/stall/question) → round 2.
-    # Thread cleared (skip/reject) → retry next candidate.
     if thread and thread[-1]["role"] == "seller":
-        return "make_counter"
-    return "make_offer"
+        return "make_counter"   # seller countered → round 2
+    return "make_offer"         # rejected → next candidate
 
 
 def _after_decide_counter(state: ProcurementState) -> str:
@@ -55,6 +62,7 @@ def build_graph() -> tuple:
     builder.add_node("confirm_candidate", confirm_candidate_node)
     builder.add_node("make_offer", make_offer_node)
     builder.add_node("decide_offer", decide_offer_node)
+    builder.add_node("seller_turn", seller_turn_node)
     builder.add_node("make_counter", make_counter_node)
     builder.add_node("decide_counter", decide_counter_node)
     builder.add_node("plan_meetup", plan_meetup_node)
@@ -77,6 +85,11 @@ def build_graph() -> tuple:
     builder.add_conditional_edges(
         "decide_offer",
         _after_decide_offer,
+        {"seller_turn": "seller_turn", "make_offer": "make_offer", END: END},
+    )
+    builder.add_conditional_edges(
+        "seller_turn",
+        _after_seller_turn,
         {"make_offer": "make_offer", "make_counter": "make_counter",
          "plan_meetup": "plan_meetup", END: END},
     )

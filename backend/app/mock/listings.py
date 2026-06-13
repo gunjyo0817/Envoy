@@ -53,6 +53,21 @@ FACEBOOK_LISTINGS = [
     },
 ]
 
+# The seller's real item, presented as a Kleinanzeigen listing. Image search matches this.
+SEEDED_DEMO_LISTING = {
+    "platform": "kleinanzeigen",
+    "listing_id": "demo-seed-001",
+    "title": "iPhone 14 128GB Midnight — wie neu",
+    "price_text": "€185",
+    "location": "Schwabing, München",
+    "url": "https://www.kleinanzeigen.de/s-anzeige/demo-seed-001",
+    "image_url": "https://example.com/REPLACE_WITH_REAL_PHOTO.jpg",
+    "seller_rating": 4.9,
+    "seller_reviews": 24,
+    "raw_description": "iPhone 14 128GB Midnight. Wie neu, kaum benutzt. Mit Originalverpackung.",
+    "match_keywords": ["iphone", "14", "128", "midnight"],
+}
+
 VINTED_FALLBACK_LISTINGS = [
     {
         "platform": "vinted",

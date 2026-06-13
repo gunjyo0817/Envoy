@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createSession, identifyImage, reverseGeocode } from '../api'
+import { createSession, visionSearch, reverseGeocode } from '../api'
+import type { VisionSearchResult } from '../api'
 import { useI18n } from '../i18n/I18nProvider'
 import { useAuth } from '../auth/AuthProvider'
 import LanguageSwitcher from '../components/LanguageSwitcher'
@@ -33,6 +34,7 @@ export default function InputScreen({ onStart }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [identifying, setIdentifying] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [matchedListing, setMatchedListing] = useState<VisionSearchResult['matched_listing']>(null)
   const [locating, setLocating] = useState(false)
   const [locationHint, setLocationHint] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -72,17 +74,20 @@ export default function InputScreen({ onStart }: Props) {
 
   const handleFile = (file: File) => {
     setError(null)
+    setMatchedListing(null)
     const reader = new FileReader()
     reader.onload = async () => {
       const dataUrl = reader.result as string
       setImagePreview(dataUrl)
-      // Strip the "data:...;base64," prefix before sending
-      const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
       setIdentifying(true)
       try {
-        const identified = await identifyImage(base64)
-        setQuery(identified)
+        // The endpoint accepts a full data URL; it returns a query plus an
+        // optional seeded listing match.
+        const result = await visionSearch(dataUrl)
+        if (result.query) setQuery(result.query)
+        setMatchedListing(result.matched_listing)
       } catch {
+        // Non-fatal: leave the query field for manual entry.
         setError('Could not identify the image. Try another photo or type your item.')
       } finally {
         setIdentifying(false)
@@ -96,6 +101,7 @@ export default function InputScreen({ onStart }: Props) {
 
   const clearImage = () => {
     setImagePreview(null)
+    setMatchedListing(null)
   }
 
   const handleLocate = () => {
@@ -278,6 +284,19 @@ export default function InputScreen({ onStart }: Props) {
                 </span>
               )}
             </div>
+
+            {/* Seeded match — confirms the photo resolved to a real listing */}
+            {matchedListing && (
+              <div className="mt-2.5 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--color-primary)]/40 bg-[var(--color-primary)]/10 px-2.5 py-1.5 text-xs font-medium text-[var(--color-ink)]">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="truncate">
+                  Matched: {matchedListing.title}
+                  {matchedListing.price_text ? ` · ${matchedListing.price_text}` : ''}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Budget range */}

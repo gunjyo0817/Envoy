@@ -5,6 +5,7 @@ const STATUS_STEP: Record<string, number> = {
   reviewing: 1,
   awaiting_human: 2,
   negotiating: 3,
+  awaiting_seller: 3,
   coordinating: 4,
   done: 5,
 }
