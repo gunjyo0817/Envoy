@@ -365,6 +365,13 @@ async def calendar_event(req: CalendarEventRequest, user_id: int = Depends(_requ
     return result
 
 
+@app.get("/calendar/freebusy")
+async def calendar_freebusy(time_min: str, time_max: str, user_id: int = Depends(_require_user)):
+    loop = asyncio.get_event_loop()
+    busy = await loop.run_in_executor(None, gcal.query_freebusy, user_id, time_min, time_max)
+    return {"busy": busy}
+
+
 @app.post("/translate")
 async def translate_text(req: TranslateRequest):
     loop = asyncio.get_event_loop()

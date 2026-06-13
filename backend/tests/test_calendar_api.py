@@ -61,3 +61,15 @@ def test_create_event_409_when_not_connected():
     finally:
         main.app.dependency_overrides.clear()
     assert r.status_code == 409
+
+
+def test_freebusy_returns_busy_intervals():
+    main, client = _client()
+    main.app.dependency_overrides[main._require_user] = lambda: 4
+    try:
+        with patch("app.main.gcal.query_freebusy",
+                   return_value=[{"start": "2026-06-20T10:00:00Z", "end": "2026-06-20T11:00:00Z"}]):
+            r = client.get("/calendar/freebusy?time_min=2026-06-20T00:00:00Z&time_max=2026-06-27T00:00:00Z")
+    finally:
+        main.app.dependency_overrides.clear()
+    assert r.status_code == 200 and r.json()["busy"][0]["start"].startswith("2026-06-20")
