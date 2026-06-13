@@ -4,22 +4,39 @@ from app.state import ProcurementState
 from app.agents.search import search_node
 from app.agents.extract import extract_node
 from app.agents.analyst import analyst_node, confirm_candidate_node
-from app.agents.negotiate import negotiate_node
+from app.agents.negotiate import (
+    make_offer_node, decide_offer_node, make_counter_node, decide_counter_node,
+)
 from app.agents.coordinate import plan_meetup_node, confirm_meetup_node
 
 
 def _after_confirm(state: ProcurementState) -> str:
     if state["status"] == "failed":
         return END
-    return "negotiate"
+    return "make_offer"
 
 
-def _should_continue_negotiating(state: ProcurementState) -> str:
-    if state["status"] == "failed":
-        return END
+def _after_make_offer(state: ProcurementState) -> str:
+    return END if state["status"] == "failed" else "decide_offer"
+
+
+def _after_decide_offer(state: ProcurementState) -> str:
     if state["status"] == "coordinating":
         return "plan_meetup"
-    return "negotiate"
+    if state["status"] == "failed":
+        return END
+    thread = state.get("negotiation_thread") or []
+    # Seller still negotiating (counter/stall/question) → round 2.
+    # Thread cleared (skip/reject) → retry next candidate.
+    if thread and thread[-1]["role"] == "seller":
+        return "make_counter"
+    return "make_offer"
+
+
+def _after_decide_counter(state: ProcurementState) -> str:
+    if state["status"] == "coordinating":
+        return "plan_meetup"
+    return "make_offer"  # walked away → try next candidate
 
 
 def _after_confirm_meetup(state: ProcurementState) -> str:
@@ -36,7 +53,10 @@ def build_graph() -> tuple:
     builder.add_node("extract", extract_node)
     builder.add_node("analyst", analyst_node)
     builder.add_node("confirm_candidate", confirm_candidate_node)
-    builder.add_node("negotiate", negotiate_node)
+    builder.add_node("make_offer", make_offer_node)
+    builder.add_node("decide_offer", decide_offer_node)
+    builder.add_node("make_counter", make_counter_node)
+    builder.add_node("decide_counter", decide_counter_node)
     builder.add_node("plan_meetup", plan_meetup_node)
     builder.add_node("confirm_meetup", confirm_meetup_node)
 
@@ -47,12 +67,24 @@ def build_graph() -> tuple:
     builder.add_conditional_edges(
         "confirm_candidate",
         _after_confirm,
-        {"negotiate": "negotiate", END: END},
+        {"make_offer": "make_offer", END: END},
     )
     builder.add_conditional_edges(
-        "negotiate",
-        _should_continue_negotiating,
-        {"negotiate": "negotiate", "plan_meetup": "plan_meetup", END: END},
+        "make_offer",
+        _after_make_offer,
+        {"decide_offer": "decide_offer", END: END},
+    )
+    builder.add_conditional_edges(
+        "decide_offer",
+        _after_decide_offer,
+        {"make_offer": "make_offer", "make_counter": "make_counter",
+         "plan_meetup": "plan_meetup", END: END},
+    )
+    builder.add_edge("make_counter", "decide_counter")
+    builder.add_conditional_edges(
+        "decide_counter",
+        _after_decide_counter,
+        {"make_offer": "make_offer", "plan_meetup": "plan_meetup"},
     )
     builder.add_edge("plan_meetup", "confirm_meetup")
     builder.add_conditional_edges(

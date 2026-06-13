@@ -5,6 +5,11 @@ from app.state import ProcurementState, PendingDecision, NegotiationMessage
 from app.agents.extract import classify_message
 from app.mock.seller import mock_seller_response
 
+
+def _ts() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
 def _gemini_opening_offer(listing: dict, budget: float) -> dict:
     """Returns {offer_price: float, message_text: str}"""
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
@@ -19,6 +24,7 @@ def _gemini_opening_offer(listing: dict, budget: float) -> dict:
     text = model.generate_content(prompt).text.strip()
     text = text.removeprefix("```json").removesuffix("```").strip()
     return json.loads(text)
+
 
 def _gemini_counter_response(thread: list, budget: float, seller_price: float) -> dict:
     """Returns {offer_price: float, message_text: str, recommendation: str}"""
@@ -36,85 +42,114 @@ def _gemini_counter_response(thread: list, budget: float, seller_price: float) -
     text = text.removeprefix("```json").removesuffix("```").strip()
     return json.loads(text)
 
-def negotiate_node(state: ProcurementState) -> dict:
+
+def _listing_price(state: ProcurementState) -> float:
+    listing = state["ranked_candidates"][state["current_candidate_index"]]
+    return listing.get("price_eur") or state["budget"]
+
+
+# ── Round 1 ─────────────────────────────────────────────────────────────────
+
+def make_offer_node(state: ProcurementState) -> dict:
+    """Compute the opening offer and commit it to the thread before pausing.
+
+    Runs the Gemini call here (not in the interrupt node) so resuming never
+    re-generates a different offer. Resets the thread for a fresh candidate.
+    """
     degraded = list(state.get("degraded", []))
     idx = state["current_candidate_index"]
     candidates = state["ranked_candidates"]
-
     if idx >= len(candidates):
         return {"status": "failed", "degraded": degraded}
 
     listing = candidates[idx]
     listing_price = listing.get("price_eur") or state["budget"]
-    thread = list(state.get("negotiation_thread", []))
-    ts = lambda: datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-    # --- Round 1: opening offer ---
-    if not thread:
-        offer_data = _gemini_opening_offer(listing, state["budget"])
-        offer_price = offer_data.get("offer_price") or round(listing_price * 0.85)
-        buyer_msg: NegotiationMessage = {
-            "role": "buyer", "text": offer_data["message_text"],
-            "act": "initial_offer", "price": offer_price, "ts": ts()
+    offer_data = _gemini_opening_offer(listing, state["budget"])
+    offer_price = offer_data.get("offer_price") or round(listing_price * 0.85)
+    buyer_msg: NegotiationMessage = {
+        "role": "buyer", "text": offer_data["message_text"],
+        "act": "initial_offer", "price": float(offer_price), "ts": _ts(),
+    }
+
+    pending: PendingDecision = {
+        "checkpoint": "confirm_offer",
+        "summary": f"Opening offer: €{offer_price:.0f} to seller (listed at €{listing_price:.0f}). Send?",
+        "options": [
+            {"id": "approve", "label": f"Send €{offer_price:.0f}"},
+            {"id": "lower", "label": "Go lower"},
+            {"id": "skip", "label": "Skip this seller"},
+        ],
+        "context": {"offer_price": offer_price, "listing_price": listing_price},
+    }
+    return {
+        "negotiation_thread": [buyer_msg],
+        "pending_decision": pending,
+        "status": "awaiting_human",
+        "degraded": list(set(degraded)),
+    }
+
+
+def decide_offer_node(state: ProcurementState) -> dict:
+    """Pause for the opening-offer decision, then simulate the seller reply.
+
+    The seller simulation runs *after* the single interrupt, so the node
+    completes and commits the seller message — nothing re-generates on resume.
+    """
+    degraded = list(state.get("degraded", []))
+    idx = state["current_candidate_index"]
+    listing_price = _listing_price(state)
+    thread = list(state["negotiation_thread"])
+
+    choice = interrupt(state["pending_decision"])
+    entry = {"checkpoint": "confirm_offer", "choice": choice, "ts": _ts()}
+    history = state["decision_history"] + [entry]
+
+    if choice == "skip":
+        return {
+            "negotiation_thread": [], "current_candidate_index": idx + 1,
+            "decision_history": history, "status": "negotiating",
+            "pending_decision": None,
         }
-        thread.append(buyer_msg)
 
-        pending: PendingDecision = {
-            "checkpoint": "confirm_offer",
-            "summary": f"Opening offer: €{offer_price:.0f} to seller (listed at €{listing_price:.0f}). Send?",
-            "options": [
-                {"id": "approve", "label": f"Send €{offer_price:.0f}"},
-                {"id": "lower", "label": "Go lower"},
-                {"id": "skip", "label": "Skip this seller"},
-            ],
-            "context": {"offer_price": offer_price, "listing_price": listing_price},
-        }
-        choice = interrupt(pending)
-        decision_entry = {"checkpoint": "confirm_offer", "choice": choice, "ts": ts()}
+    offer_price = thread[-1]["price"]
+    if choice == "lower":
+        offer_price = round(listing_price * 0.78)
+        thread[-1] = {**thread[-1], "price": float(offer_price),
+                      "text": f"Würden Sie €{offer_price:.0f} akzeptieren?"}
 
-        if choice == "skip":
-            return {
-                "negotiation_thread": [],
-                "current_candidate_index": idx + 1,
-                "decision_history": state["decision_history"] + [decision_entry],
-                "status": "negotiating",
-            }
-        if choice == "lower":
-            offer_price = round(listing_price * 0.78)
-            thread[-1] = {**thread[-1], "price": float(offer_price),
-                          "text": f"Würden Sie €{offer_price:.0f} akzeptieren?"}
+    seller_reply = mock_seller_response(listing_price, offer_price)
+    classified = classify_message(seller_reply["text"], record_degraded=degraded)
+    seller_reply = {**seller_reply, "act": classified["act"],
+                    "price": classified.get("price") or seller_reply.get("price")}
+    thread.append(seller_reply)
 
-        # Simulate seller response
-        seller_reply = mock_seller_response(listing_price, offer_price)
-        classified = classify_message(seller_reply["text"], record_degraded=degraded)
-        seller_reply = {**seller_reply, "act": classified["act"],
-                        "price": classified.get("price") or seller_reply.get("price")}
-        thread.append(seller_reply)
+    base = {
+        "negotiation_thread": thread, "decision_history": history,
+        "degraded": list(set(degraded)), "pending_decision": None,
+    }
+    if seller_reply["act"] == "accept":
+        return {**base, "final_price": float(offer_price), "status": "coordinating"}
+    if seller_reply["act"] == "reject":
+        return {**base, "negotiation_thread": [],
+                "current_candidate_index": idx + 1, "status": "negotiating"}
+    # counter / stall / question — seller is still negotiating, go to round 2
+    return {**base, "status": "negotiating"}
 
-        if seller_reply["act"] == "accept":
-            return {
-                "negotiation_thread": thread,
-                "final_price": offer_price,
-                "decision_history": state["decision_history"] + [decision_entry],
-                "degraded": list(set(degraded)),
-                "status": "coordinating",
-            }
 
-    # --- Round 2: handle counter-offer ---
+# ── Round 2 (seller counter) ─────────────────────────────────────────────────
+
+def make_counter_node(state: ProcurementState) -> dict:
+    """Compute the counter recommendation and commit it before pausing."""
+    degraded = list(state.get("degraded", []))
+    listing_price = _listing_price(state)
+    thread = list(state["negotiation_thread"])
+
     last_seller = next((m for m in reversed(thread) if m["role"] == "seller"), None)
-    if not last_seller or last_seller["act"] in ("accept",):
-        return {"negotiation_thread": thread, "status": "coordinating",
-                "final_price": state.get("final_price"), "degraded": list(set(degraded))}
-
-    if last_seller["act"] == "reject":
-        return {"negotiation_thread": [],
-                "current_candidate_index": idx + 1, "status": "negotiating",
-                "degraded": list(set(degraded))}
-
-    seller_price = last_seller.get("price") or listing_price
+    seller_price = (last_seller.get("price") if last_seller else None) or listing_price
     counter_data = _gemini_counter_response(thread, state["budget"], seller_price)
 
-    pending2: PendingDecision = {
+    pending: PendingDecision = {
         "checkpoint": "confirm_offer",
         "summary": (f"Seller countered at €{seller_price:.0f}. "
                     f"Agent recommends: {counter_data['recommendation']}"),
@@ -125,40 +160,50 @@ def negotiate_node(state: ProcurementState) -> dict:
         ],
         "context": {"seller_price": seller_price, "counter_data": counter_data},
     }
-    choice2 = interrupt(pending2)
-    decision_entry2 = {"checkpoint": "confirm_offer", "choice": choice2, "ts": ts()}
+    return {
+        "pending_decision": pending,
+        "status": "awaiting_human",
+        "degraded": list(set(degraded)),
+    }
 
-    if choice2 == "accept":
-        return {
-            "negotiation_thread": thread,
-            "final_price": seller_price,
-            "decision_history": state["decision_history"] + [decision_entry2],
-            "degraded": list(set(degraded)),
-            "status": "coordinating",
-        }
-    if choice2 == "skip":
-        return {
-            "negotiation_thread": [],
-            "current_candidate_index": idx + 1,
-            "decision_history": state["decision_history"] + [decision_entry2],
-            "status": "negotiating",
-        }
 
-    # Counter offer
-    counter_price = counter_data.get("offer_price") or seller_price - 5
+def decide_counter_node(state: ProcurementState) -> dict:
+    """Pause for the counter decision, then resolve the deal."""
+    degraded = list(state.get("degraded", []))
+    idx = state["current_candidate_index"]
+    listing_price = _listing_price(state)
+    thread = list(state["negotiation_thread"])
+    pending = state["pending_decision"]
+    seller_price = pending["context"]["seller_price"]
+    counter_data = pending["context"]["counter_data"]
+
+    choice = interrupt(pending)
+    entry = {"checkpoint": "confirm_offer", "choice": choice, "ts": _ts()}
+    history = state["decision_history"] + [entry]
+    base = {
+        "negotiation_thread": thread, "decision_history": history,
+        "degraded": list(set(degraded)), "pending_decision": None,
+    }
+
+    if choice == "accept":
+        return {**base, "final_price": float(seller_price), "status": "coordinating"}
+    if choice == "skip":
+        return {**base, "negotiation_thread": [],
+                "current_candidate_index": idx + 1, "status": "negotiating"}
+
+    # counter back, then resolve with one more seller turn
+    counter_price = counter_data.get("offer_price") or (seller_price - 5)
     buyer_counter: NegotiationMessage = {
         "role": "buyer", "text": counter_data["message_text"],
-        "act": "counter_offer", "price": float(counter_price), "ts": ts()
+        "act": "counter_offer", "price": float(counter_price), "ts": _ts(),
     }
     thread.append(buyer_counter)
     seller_final = mock_seller_response(listing_price, counter_price)
+    classified = classify_message(seller_final["text"], record_degraded=degraded)
+    seller_final = {**seller_final, "act": classified["act"],
+                    "price": classified.get("price") or seller_final.get("price")}
     thread.append(seller_final)
     final_price = counter_price if seller_final["act"] == "accept" else seller_price
 
-    return {
-        "negotiation_thread": thread,
-        "final_price": float(final_price),
-        "decision_history": state["decision_history"] + [decision_entry2],
-        "degraded": list(set(degraded)),
-        "status": "coordinating",
-    }
+    return {**base, "negotiation_thread": thread,
+            "final_price": float(final_price), "status": "coordinating"}
