@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { SessionState } from '../api'
 import StepBar from '../components/StepBar'
 import NegotiationThread from '../components/NegotiationThread'
@@ -11,6 +11,10 @@ export default function NegotiateScreen({ state, onFeedback }: Props) {
   const thread = state.negotiation_thread ?? []
   const decision = state.pending_decision!
   const listing = state.ranked_candidates?.[0]
+
+  // Round 1 and round 2 both render this same component (both confirm_offer),
+  // so re-enable the buttons whenever a new checkpoint arrives.
+  useEffect(() => { setLoading(false) }, [decision?.summary])
 
   const handleChoice = async (choice: string) => {
     setLoading(true)

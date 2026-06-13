@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { SessionState } from '../api'
 import StepBar from '../components/StepBar'
 import CheckpointBanner from '../components/CheckpointBanner'
@@ -9,6 +9,10 @@ export default function MeetupScreen({ state, onFeedback }: Props) {
   const [loading, setLoading] = useState(false)
   const decision = state.pending_decision!
   const proposal = decision.context.meetup_proposal as any
+
+  // "Reschedule" re-renders this same component with a fresh proposal;
+  // re-enable the buttons when a new checkpoint arrives.
+  useEffect(() => { setLoading(false) }, [decision?.summary])
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center p-4">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { SessionState } from '../api'
 import StepBar from '../components/StepBar'
 import ListingCard from '../components/ListingCard'
@@ -10,6 +10,9 @@ export default function ChooseScreen({ state, onFeedback }: Props) {
   const [loading, setLoading] = useState(false)
   const candidates = state.ranked_candidates ?? []
   const decision = state.pending_decision!
+
+  // Re-enable buttons if this checkpoint re-renders with new content.
+  useEffect(() => { setLoading(false) }, [decision?.summary])
 
   const handleChoice = async (choice: string) => {
     setLoading(true)
