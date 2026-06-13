@@ -27,7 +27,7 @@ def _get_travel_time(origin: str, destination: str) -> dict:
 def _gemini_meetup_proposal(buyer_location: str, seller_location: str,
                              buyer_route: dict, final_price: float) -> dict:
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     prompt = (
         f"Suggest a convenient public meetup location between '{buyer_location}' and "
         f"'{seller_location}' in München (a Bahnhof, Marktplatz, or well-known landmark). "
@@ -38,11 +38,17 @@ def _gemini_meetup_proposal(buyer_location: str, seller_location: str,
     text = text.removeprefix("```json").removesuffix("```").strip()
     return json.loads(text)
 
-def coordinate_node(state: ProcurementState) -> dict:
+def plan_meetup_node(state: ProcurementState) -> dict:
+    """Compute the meetup proposal (Gemini + Maps) and COMMIT it to state.
+
+    This node does all the expensive LLM/API work and returns, so the proposal
+    is persisted before the interrupt happens in confirm_meetup_node. Because
+    LangGraph resumes at the interrupted node (not here), this never re-runs and
+    the user sees exactly the proposal that gets finalized.
+    """
     idx = state["current_candidate_index"]
     listing = state["ranked_candidates"][idx]
     final_price = state.get("final_price") or listing.get("price_eur", 0)
-    ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
     buyer_location = state["location"]
     seller_location = listing.get("location_city") or listing.get("location", "München")
@@ -72,17 +78,38 @@ def coordinate_node(state: ProcurementState) -> dict:
         ],
         "context": {"meetup_proposal": meetup_proposal},
     }
-    choice = interrupt(pending)
-    decision_entry = {"checkpoint": "confirm_meetup", "choice": choice, "ts": ts}
+    return {
+        "meetup_proposal": meetup_proposal,
+        "pending_decision": pending,
+        "status": "awaiting_human",
+    }
 
+
+def confirm_meetup_node(state: ProcurementState) -> dict:
+    """Human checkpoint 3: pause for the buyer to confirm the planned meetup.
+
+    Cheap gate node (no LLM) so resuming re-runs nothing expensive. Reads the
+    already-committed proposal and pending decision from state.
+    """
+    choice = interrupt(state["pending_decision"])
+    ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    decision_entry = {"checkpoint": "confirm_meetup", "choice": choice, "ts": ts}
     if choice == "cancel":
         return {
             "status": "failed",
+            "pending_decision": None,
             "decision_history": state["decision_history"] + [decision_entry],
         }
-
+    if choice == "reschedule":
+        # re-plan: route back to plan_meetup for a fresh proposal
+        return {
+            "pending_decision": None,
+            "status": "coordinating",
+            "decision_history": state["decision_history"] + [decision_entry],
+        }
+    # confirm
     return {
-        "meetup_proposal": meetup_proposal,
+        "meetup_proposal": state["meetup_proposal"],
         "confirmed": True,
         "pending_decision": None,
         "decision_history": state["decision_history"] + [decision_entry],

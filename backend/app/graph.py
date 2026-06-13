@@ -5,7 +5,7 @@ from app.agents.search import search_node
 from app.agents.extract import extract_node
 from app.agents.analyst import analyst_node, confirm_candidate_node
 from app.agents.negotiate import negotiate_node
-from app.agents.coordinate import coordinate_node
+from app.agents.coordinate import plan_meetup_node, confirm_meetup_node
 
 
 def _after_confirm(state: ProcurementState) -> str:
@@ -18,8 +18,16 @@ def _should_continue_negotiating(state: ProcurementState) -> str:
     if state["status"] == "failed":
         return END
     if state["status"] == "coordinating":
-        return "coordinate"
+        return "plan_meetup"
     return "negotiate"
+
+
+def _after_confirm_meetup(state: ProcurementState) -> str:
+    if state["status"] == "done":
+        return END
+    if state["status"] == "failed":
+        return END
+    return "plan_meetup"  # reschedule
 
 
 def build_graph() -> tuple:
@@ -29,7 +37,8 @@ def build_graph() -> tuple:
     builder.add_node("analyst", analyst_node)
     builder.add_node("confirm_candidate", confirm_candidate_node)
     builder.add_node("negotiate", negotiate_node)
-    builder.add_node("coordinate", coordinate_node)
+    builder.add_node("plan_meetup", plan_meetup_node)
+    builder.add_node("confirm_meetup", confirm_meetup_node)
 
     builder.set_entry_point("search")
     builder.add_edge("search", "extract")
@@ -43,9 +52,14 @@ def build_graph() -> tuple:
     builder.add_conditional_edges(
         "negotiate",
         _should_continue_negotiating,
-        {"negotiate": "negotiate", "coordinate": "coordinate", END: END},
+        {"negotiate": "negotiate", "plan_meetup": "plan_meetup", END: END},
     )
-    builder.add_edge("coordinate", END)
+    builder.add_edge("plan_meetup", "confirm_meetup")
+    builder.add_conditional_edges(
+        "confirm_meetup",
+        _after_confirm_meetup,
+        {"plan_meetup": "plan_meetup", END: END},
+    )
 
     # All three human checkpoints use dynamic interrupt() inside their nodes,
     # so no static interrupt_before is needed — resume is uniformly
