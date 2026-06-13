@@ -138,6 +138,16 @@ export async function postFeedback(
   })
 }
 
+export async function translateText(text: string, targetLang: string): Promise<string> {
+  const r = await fetch(`${BASE}/translate`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, target_lang: targetLang }),
+  })
+  if (!r.ok) return ''
+  const data = await r.json()
+  return data.translation ?? ''
+}
+
 export function connectWS(
   sessionId: string,
   onEvent: (e: WsEvent) => void
