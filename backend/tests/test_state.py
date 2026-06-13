@@ -1,9 +1,10 @@
 from app.state import ProcurementState, PendingDecision, NegotiationMessage, initial_state
 
 def test_initial_state_has_required_keys():
-    s = initial_state("iPhone 14", 200.0, "good+", "München", 15)
+    s = initial_state("iPhone 14", 0.0, 200.0, "good+", "München", 15)
     assert s["query"] == "iPhone 14"
-    assert s["budget"] == 200.0
+    assert s["budget_min"] == 0.0
+    assert s["budget_max"] == 200.0
     assert s["status"] == "searching"
     assert s["degraded"] == []
     assert s["decision_history"] == []

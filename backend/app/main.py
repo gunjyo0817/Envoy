@@ -20,7 +20,9 @@ _sessions: dict[str, dict] = {}   # session_id → {thread_id, last_state}
 
 class SessionRequest(BaseModel):
     query: str
-    budget: float
+    budget_min: float = 0.0
+    budget_max: float | None = None
+    budget: float | None = None  # legacy alias for budget_max; remove once frontend sends the range
     condition: str = "good+"
     location: str
     max_distance_km: int = 15
@@ -81,7 +83,9 @@ async def create_session(req: SessionRequest):
     thread_id = session_id
     _sessions[session_id] = {"thread_id": thread_id, "last_state": None}
 
-    state = initial_state(req.query, req.budget, req.condition, req.location, req.max_distance_km)
+    budget_max = req.budget_max if req.budget_max is not None else (req.budget or 200.0)
+    state = initial_state(req.query, req.budget_min, budget_max,
+                          req.condition, req.location, req.max_distance_km)
     loop = asyncio.get_event_loop()
     await loop.run_in_executor(None, _run_graph, thread_id, state, session_id)
     return {"session_id": session_id}

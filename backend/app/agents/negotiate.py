@@ -45,7 +45,7 @@ def _gemini_counter_response(thread: list, budget: float, seller_price: float) -
 
 def _listing_price(state: ProcurementState) -> float:
     listing = state["ranked_candidates"][state["current_candidate_index"]]
-    return listing.get("price_eur") or state["budget"]
+    return listing.get("price_eur") or state["budget_max"]
 
 
 # ── Round 1 ─────────────────────────────────────────────────────────────────
@@ -63,9 +63,9 @@ def make_offer_node(state: ProcurementState) -> dict:
         return {"status": "failed", "degraded": degraded}
 
     listing = candidates[idx]
-    listing_price = listing.get("price_eur") or state["budget"]
+    listing_price = listing.get("price_eur") or state["budget_max"]
 
-    offer_data = _gemini_opening_offer(listing, state["budget"])
+    offer_data = _gemini_opening_offer(listing, state["budget_max"])
     offer_price = offer_data.get("offer_price") or round(listing_price * 0.85)
     buyer_msg: NegotiationMessage = {
         "role": "buyer", "text": offer_data["message_text"],
@@ -154,7 +154,7 @@ def make_counter_node(state: ProcurementState) -> dict:
 
     last_seller = next((m for m in reversed(thread) if m["role"] == "seller"), None)
     seller_price = (last_seller.get("price") if last_seller else None) or listing_price
-    counter_data = _gemini_counter_response(thread, state["budget"], seller_price)
+    counter_data = _gemini_counter_response(thread, state["budget_max"], seller_price)
 
     pending: PendingDecision = {
         "checkpoint": "confirm_offer",

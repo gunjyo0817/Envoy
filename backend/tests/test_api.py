@@ -17,7 +17,7 @@ def test_post_session_returns_session_id():
         from app.main import app
         client = TestClient(app)
         resp = client.post("/session", json={
-            "query": "iPhone 14", "budget": 200.0,
+            "query": "iPhone 14", "budget_min": 0.0, "budget_max": 200.0,
             "condition": "good+", "location": "München", "max_distance_km": 15
         })
     assert resp.status_code == 200

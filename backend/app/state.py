@@ -20,7 +20,8 @@ class NegotiationMessage(TypedDict):
 class ProcurementState(TypedDict):
     # Input
     query: str
-    budget: float
+    budget_min: float
+    budget_max: float
     condition: str
     location: str
     max_distance_km: int
@@ -49,10 +50,12 @@ class ProcurementState(TypedDict):
 
 
 def initial_state(
-    query: str, budget: float, condition: str, location: str, max_distance_km: int
+    query: str, budget_min: float, budget_max: float,
+    condition: str, location: str, max_distance_km: int
 ) -> ProcurementState:
     return {
-        "query": query, "budget": budget, "condition": condition,
+        "query": query, "budget_min": budget_min, "budget_max": budget_max,
+        "condition": condition,
         "location": location, "max_distance_km": max_distance_km,
         "raw_listings": [], "structured_listings": [],
         "ranked_candidates": [], "current_candidate_index": 0,
