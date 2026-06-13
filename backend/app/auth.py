@@ -72,6 +72,31 @@ def login(email: str, password: str) -> dict:
     return {"token": _issue_token(row["id"]), "user": _public_user(row["id"])}
 
 
+def find_or_create_google_user(email: str, name: str = "") -> dict:
+    email = email.strip().lower()
+    if not email:
+        raise AuthError(400, "Google account has no email")
+    with _connect() as conn:
+        row = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+        if row:
+            user_id = row["id"]
+            # backfill a name if the existing record had none
+            if name:
+                conn.execute("UPDATE users SET name = COALESCE(NULLIF(name,''), ?) WHERE id = ?", (name, user_id))
+        else:
+            cur = conn.execute(
+                "INSERT INTO users (email, name, pw_hash, salt) VALUES (?, ?, '', '')",
+                (email, name),
+            )
+            user_id = cur.lastrowid
+    return {"token": _issue_token(user_id), "user": _public_user(user_id)}
+
+
+def public_user_for_token(token: str | None) -> dict | None:
+    uid = user_id_for_token(token)
+    return _public_user(uid) if uid is not None else None
+
+
 def user_id_for_token(token: str | None) -> int | None:
     if not token:
         return None

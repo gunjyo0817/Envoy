@@ -29,6 +29,16 @@ export async function login(email: string, password: string): Promise<AuthResult
   return r.json()
 }
 
+export function googleLoginUrl(): string {
+  return `${BASE}/auth/google/login`
+}
+
+export async function fetchMe(): Promise<AuthUser> {
+  const r = await fetch(`${BASE}/auth/me`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Not authenticated')
+  return r.json()
+}
+
 export interface UserSettings { language: string; default_address: string }
 
 export async function getSettings(): Promise<UserSettings> {

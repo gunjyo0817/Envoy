@@ -1,8 +1,15 @@
-import uuid, asyncio, os
+import uuid, asyncio, os, urllib.parse
+import httpx
 from dotenv import load_dotenv
 load_dotenv()
 
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "855648623975-dp7249vk7c23jec841cs5favcd7f9tl9.apps.googleusercontent.com")
+GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+GOOGLE_REDIRECT_URI = os.environ.get("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/google/callback")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, Header
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from langgraph.types import Command
@@ -12,6 +19,7 @@ from app.state import initial_state
 from app.sessions import register_ws, unregister_ws, broadcast, get_logs
 from app.auth import (
     init_db, signup, login, user_id_for_token, get_settings, update_settings, AuthError,
+    find_or_create_google_user, public_user_for_token,
 )
 from app.services import translate, identify_product
 
@@ -172,6 +180,53 @@ async def auth_login(req: LoginRequest):
         return login(req.email, req.password)
     except AuthError as e:
         raise HTTPException(status_code=e.code, detail=e.detail)
+
+
+@app.get("/auth/me")
+async def auth_me(user_id: int = Depends(_require_user)):
+    from app.auth import _public_user
+    return _public_user(user_id)
+
+
+@app.get("/auth/google/login")
+async def google_login():
+    params = {
+        "client_id": GOOGLE_CLIENT_ID,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "online",
+        "prompt": "select_account",
+    }
+    url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+    return RedirectResponse(url)
+
+
+@app.get("/auth/google/callback")
+async def google_callback(code: str | None = None, error: str | None = None):
+    if error or not code:
+        return RedirectResponse(f"{FRONTEND_URL}/?auth_error=google")
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            tok = await client.post("https://oauth2.googleapis.com/token", data={
+                "code": code,
+                "client_id": GOOGLE_CLIENT_ID,
+                "client_secret": GOOGLE_CLIENT_SECRET,
+                "redirect_uri": GOOGLE_REDIRECT_URI,
+                "grant_type": "authorization_code",
+            })
+            tok.raise_for_status()
+            access_token = tok.json()["access_token"]
+            info = await client.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            info.raise_for_status()
+            profile = info.json()
+        result = find_or_create_google_user(profile.get("email", ""), profile.get("name", ""))
+        return RedirectResponse(f"{FRONTEND_URL}/?token={result['token']}")
+    except Exception:
+        return RedirectResponse(f"{FRONTEND_URL}/?auth_error=google")
 
 
 @app.get("/settings")
