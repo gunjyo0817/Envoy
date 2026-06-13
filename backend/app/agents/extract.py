@@ -101,7 +101,7 @@ def _pioneer_classify(text: str) -> dict:
 
 def _gemini_extract_listing(raw_text: str) -> dict:
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     prompt = (
         'Extract from this second-hand listing. Return JSON only, no markdown:\n'
         '{"brand": str, "model": str, "condition": "new"|"like_new"|"very_good"|"good"|"acceptable",'
@@ -114,7 +114,7 @@ def _gemini_extract_listing(raw_text: str) -> dict:
 
 def _gemini_classify(text: str) -> dict:
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     prompt = (
         'Classify this negotiation message. Return JSON only:\n'
         '{"act": "initial_offer"|"counter_offer"|"accept"|"reject"|"question"|"stall", "price": float|null}\n'
@@ -140,12 +140,25 @@ def classify_message(text: str, record_degraded: list | None = None) -> dict:
             record_degraded.append("gliner2_fallback_to_gemini")
         return _gemini_classify(text)
 
+def _backfill(extracted: dict, listing: dict) -> dict:
+    """The base GLiNER2 model often misses price/location. Fall back to the
+    listing's own structured fields (price_text, location) so downstream
+    scoring and display always have real values."""
+    if not extracted.get("price_eur"):
+        extracted["price_eur"] = _parse_price(listing.get("price_text", ""))
+    if not extracted.get("location_city"):
+        extracted["location_city"] = listing.get("location")
+    if not extracted.get("model"):
+        extracted["model"] = listing.get("title")
+    return extracted
+
 def extract_node(state: ProcurementState) -> dict:
     degraded = list(state.get("degraded", []))
     structured = []
     for listing in state["raw_listings"]:
         raw = f"{listing.get('title', '')} {listing.get('raw_description', '')} {listing.get('price_text', '')}"
         extracted = extract_listing(raw, record_degraded=degraded)
+        extracted = _backfill(extracted, listing)
         structured.append({**listing, **extracted})
     return {
         "structured_listings": structured,
