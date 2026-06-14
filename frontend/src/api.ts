@@ -8,7 +8,7 @@ export function authHeaders(): Record<string, string> {
   return _authToken ? { Authorization: `Bearer ${_authToken}` } : {}
 }
 
-export interface AuthUser { id: number; email: string; name: string; language: string; default_address: string }
+export interface AuthUser { id: number; email: string; name: string; language: string; default_address: string; onboarded: boolean }
 export interface AuthResult { token: string; user: AuthUser }
 
 export async function signup(email: string, password: string, name: string): Promise<AuthResult> {
@@ -281,6 +281,28 @@ export async function translateText(text: string, targetLang: string): Promise<s
   if (!r.ok) return ''
   const data = await r.json()
   return data.translation ?? ''
+}
+
+export async function completeOnboarding(): Promise<AuthUser> {
+  const r = await fetch(`${BASE}/onboarding/complete`, {
+    method: 'POST', headers: { ...authHeaders() },
+  })
+  if (!r.ok) throw new Error('Failed to complete onboarding')
+  return r.json()
+}
+
+export async function telegramLinkToken(): Promise<{ token: string; url: string }> {
+  const r = await fetch(`${BASE}/telegram/link-token`, {
+    method: 'POST', headers: { ...authHeaders() },
+  })
+  if (!r.ok) throw new Error('Failed to create Telegram link')
+  return r.json()
+}
+
+export async function telegramStatus(): Promise<{ connected: boolean }> {
+  const r = await fetch(`${BASE}/telegram/status`, { headers: { ...authHeaders() } })
+  if (!r.ok) throw new Error('Failed to check Telegram status')
+  return r.json()
 }
 
 export function connectWS(
