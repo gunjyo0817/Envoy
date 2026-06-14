@@ -3,15 +3,16 @@ from unittest.mock import patch, MagicMock
 from app.agents.search import search_node
 from app.state import initial_state
 
-def test_search_node_uses_mock_fallback_when_tavily_raises():
+def test_search_node_uses_generated_fallback_when_tavily_raises():
     state = initial_state("iPhone 14", 0.0, 200.0, "good+", "München", 15)
 
-    with patch("app.agents.search.TavilyClient") as MockClient:
+    with patch("app.agents.search.TavilyClient") as MockClient, \
+         patch("app.agents.search._gemini_generate_listings", side_effect=Exception("no gemini")):
         MockClient.return_value.search.side_effect = Exception("quota exceeded")
         result = search_node(state)
 
     assert len(result["raw_listings"]) > 0
-    assert "tavily_fallback_to_mock" in result["degraded"]
+    assert "search_generated_listings" in result["degraded"]
     assert result["status"] == "reviewing"
 
 def test_search_node_returns_listings_on_success():
