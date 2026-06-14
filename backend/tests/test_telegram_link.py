@@ -97,3 +97,13 @@ def test_notify_buyer_falls_back_to_role(monkeypatch):
     monkeypatch.setattr(tg, "tg_send", lambda chat_id, text, buttons=None: sent.update(chat_id=chat_id))
     tg.notify_buyer("sess-2", "msg", user_id=None)
     assert sent["chat_id"] == 7007
+
+
+def test_telegram_status_reflects_binding(client):
+    tok = client.post("/auth/signup", json={"email": "a@b.com", "password": "pw"}).json()["token"]
+    h = {"Authorization": f"Bearer {tok}"}
+    assert client.get("/telegram/status", headers=h).json()["connected"] is False
+    uid = client.get("/auth/me", headers=h).json()["id"]
+    import app.store as store
+    store.register_chat(8008, "buyer", user_id=uid)
+    assert client.get("/telegram/status", headers=h).json()["connected"] is True

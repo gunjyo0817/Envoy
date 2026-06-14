@@ -353,6 +353,11 @@ async def telegram_link_token(user_id: int = Depends(_require_user)):
     return mint_link_token(user_id)
 
 
+@app.get("/telegram/status")
+async def telegram_status(user_id: int = Depends(_require_user)):
+    return {"connected": store.chat_for_user(user_id) is not None}
+
+
 @app.get("/deals")
 async def read_deals(user_id: int = Depends(_require_user)):
     return store.list_deals(user_id)
