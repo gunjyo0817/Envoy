@@ -104,7 +104,11 @@ def _on_state_committed(session_id: str, state: dict) -> None:
         if last["role"] == "seller" and thread_len > last_notified_len:
             verb = {"accept": "accepted your offer", "counter_offer": "sent a counter-offer",
                     "reject": "declined"}.get(last["act"], "replied")
-            notify_buyer(session_id, f"Seller {verb} — review ▸")
+            notify_buyer(
+                session_id,
+                f"Seller {verb} — review ▸",
+                user_id=_sessions.get(session_id, {}).get("user_id"),
+            )
             if session_id in _sessions:
                 _sessions[session_id]["last_notified_len"] = thread_len
 

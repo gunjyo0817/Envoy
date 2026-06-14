@@ -83,8 +83,10 @@ def notify_seller_time(session_id: str, pending: dict) -> None:
     tg_send(chat_id, text, buttons)
 
 
-def notify_buyer(session_id: str, message: str) -> None:
-    chat_id = store.chat_for_role("buyer")
+def notify_buyer(session_id: str, message: str, user_id: int | None = None) -> None:
+    chat_id = store.chat_for_user(user_id) if user_id is not None else None
+    if chat_id is None:
+        chat_id = store.chat_for_role("buyer")  # demo fallback
     if chat_id is None:
         return
     tg_send(chat_id, f"{message}\n\n{FRONTEND_URL}/?session={session_id}")

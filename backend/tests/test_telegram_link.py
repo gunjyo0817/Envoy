@@ -70,3 +70,30 @@ async def test_start_seller_still_role_based():
     with patch("app.telegram.tg_send"):
         await tg._dispatch(upd, on_seller_reply=lambda *a: None)
     assert store.resolve_chat(9002)["role"] == "seller"
+
+
+def test_chat_for_user_returns_bound_chat():
+    import app.store as store
+    store.register_chat(5005, "buyer", user_id=42)
+    assert store.chat_for_user(42) == 5005
+    assert store.chat_for_user(999) is None
+
+
+def test_notify_buyer_routes_to_user_chat(monkeypatch):
+    import app.telegram as tg
+    import app.store as store
+    store.register_chat(6006, "buyer", user_id=42)
+    sent = {}
+    monkeypatch.setattr(tg, "tg_send", lambda chat_id, text, buttons=None: sent.update(chat_id=chat_id, text=text))
+    tg.notify_buyer("sess-1", "Seller replied — review", user_id=42)
+    assert sent["chat_id"] == 6006
+
+
+def test_notify_buyer_falls_back_to_role(monkeypatch):
+    import app.telegram as tg
+    import app.store as store
+    store.register_chat(7007, "buyer")  # no user_id
+    sent = {}
+    monkeypatch.setattr(tg, "tg_send", lambda chat_id, text, buttons=None: sent.update(chat_id=chat_id))
+    tg.notify_buyer("sess-2", "msg", user_id=None)
+    assert sent["chat_id"] == 7007

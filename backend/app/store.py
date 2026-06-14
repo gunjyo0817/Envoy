@@ -77,6 +77,16 @@ def chat_for_role(role: str) -> int | None:
     return row["chat_id"] if row else None
 
 
+def chat_for_user(user_id: int) -> int | None:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT chat_id FROM telegram_links WHERE user_id=? AND role='buyer' "
+            "ORDER BY rowid DESC LIMIT 1",
+            (user_id,),
+        ).fetchone()
+    return row["chat_id"] if row else None
+
+
 def record_deal(deal: dict) -> None:
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
     with _connect() as conn:
