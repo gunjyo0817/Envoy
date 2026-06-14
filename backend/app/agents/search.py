@@ -1,4 +1,5 @@
 import os, json
+from concurrent.futures import ThreadPoolExecutor
 from tavily import TavilyClient
 import google.generativeai as genai
 from app.state import ProcurementState
@@ -83,19 +84,25 @@ def search_node(state: ProcurementState) -> dict:
 
     try:
         client = TavilyClient(api_key=os.environ.get("TAVILY_API_KEY", ""))
-        for query in _build_queries(state):
-            resp = client.search(query=query, max_results=10, search_depth="advanced")
-            for r in resp.get("results", []):
-                listings.append({
-                    "platform": "kleinanzeigen" if "kleinanzeigen" in query else "vinted",
-                    "title": r.get("title", ""),
-                    "raw_description": r.get("content", ""),
-                    "url": r.get("url", ""),
-                    "price_text": "",
-                    "location": state["location"],
-                    "seller_rating": None,
-                    "seller_reviews": None,
-                })
+
+        def _run(query: str) -> list[dict]:
+            resp = client.search(query=query, max_results=8, search_depth="advanced")
+            return [{
+                "platform": "kleinanzeigen" if "kleinanzeigen" in query else "vinted",
+                "title": r.get("title", ""),
+                "raw_description": r.get("content", ""),
+                "url": r.get("url", ""),
+                "price_text": "",
+                "location": state["location"],
+                "seller_rating": None,
+                "seller_reviews": None,
+            } for r in resp.get("results", [])]
+
+        queries = _build_queries(state)
+        # The two marketplace queries are independent — run them concurrently.
+        with ThreadPoolExecutor(max_workers=len(queries)) as pool:
+            for batch in pool.map(_run, queries):
+                listings.extend(batch)
     except Exception:
         listings = []
 

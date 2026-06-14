@@ -1,6 +1,11 @@
 import os, re, json, httpx, datetime
+from concurrent.futures import ThreadPoolExecutor
 import google.generativeai as genai
 from app.state import ProcurementState
+
+# Analyst only keeps the top 5 after budget-filtering, so extracting every raw
+# listing is wasted latency. Cap how many we run through the (per-listing) LLM.
+_MAX_EXTRACT = int(os.environ.get("ENVOY_MAX_EXTRACT", "8"))
 
 _PIONEER_URL = "https://api.pioneer.ai/inference"
 _BASE_MODEL = "fastino/gliner2-base-v1"
@@ -158,14 +163,22 @@ def _backfill(extracted: dict, listing: dict) -> dict:
         extracted["model"] = listing.get("title")
     return extracted
 
+def _extract_one(listing: dict, degraded: list) -> dict:
+    raw = f"{listing.get('title', '')} {listing.get('raw_description', '')} {listing.get('price_text', '')}"
+    extracted = _backfill(extract_listing(raw, record_degraded=degraded), listing)
+    return {**listing, **extracted}
+
+
 def extract_node(state: ProcurementState) -> dict:
     degraded = list(state.get("degraded", []))
-    structured = []
-    for listing in state["raw_listings"]:
-        raw = f"{listing.get('title', '')} {listing.get('raw_description', '')} {listing.get('price_text', '')}"
-        extracted = extract_listing(raw, record_degraded=degraded)
-        extracted = _backfill(extracted, listing)
-        structured.append({**listing, **extracted})
+    listings = state["raw_listings"][:_MAX_EXTRACT]
+    # Each extraction is an independent network call; run them concurrently so
+    # total latency is ~one call instead of the sum of all of them.
+    if listings:
+        with ThreadPoolExecutor(max_workers=len(listings)) as pool:
+            structured = list(pool.map(lambda l: _extract_one(l, degraded), listings))
+    else:
+        structured = []
     return {
         "structured_listings": structured,
         "degraded": list(set(degraded)),
