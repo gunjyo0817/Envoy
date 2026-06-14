@@ -1,7 +1,9 @@
 """Google OAuth + Calendar v3 REST via raw httpx. No google client lib."""
-import os, datetime, urllib.parse
+import os, datetime, urllib.parse, logging
 import httpx
 from app import store
+
+logger = logging.getLogger("envoy.gcal")
 
 CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
@@ -100,6 +102,10 @@ def insert_event(user_id: int, summary: str, location: str,
     except httpx.HTTPStatusError as e:
         # Revoked access (401/403) or invalid/expired grant (400) → treat as
         # not-connected so the endpoint returns 409 and the UI prompts a reconnect.
+        logger.warning("calendar insert failed: %s %s", e.response.status_code, e.response.text)
         if e.response.status_code in (400, 401, 403):
             return None
         raise
+    except Exception:
+        logger.warning("calendar insert errored", exc_info=True)
+        return None
