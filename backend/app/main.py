@@ -382,15 +382,15 @@ async def calendar_auth_url(user_id: int = Depends(_require_user)):
 async def calendar_callback(code: str | None = None, state: str | None = None, error: str | None = None):
     user_id = _oauth_states.pop(state, None) if state else None
     if error or not code or user_id is None:
-        return RedirectResponse(f"{FRONTEND_URL}/settings?calendar=error")
+        return RedirectResponse(f"{FRONTEND_URL}/me?calendar=error")
     try:
         loop = asyncio.get_event_loop()
         tok = await loop.run_in_executor(None, gcal.exchange_code, code)
         store.save_google_tokens(user_id, tok["access_token"], tok["refresh_token"],
                                  tok["expiry"], gcal.SCOPE)
-        return RedirectResponse(f"{FRONTEND_URL}/settings?calendar=connected")
+        return RedirectResponse(f"{FRONTEND_URL}/me?calendar=connected")
     except Exception:
-        return RedirectResponse(f"{FRONTEND_URL}/settings?calendar=error")
+        return RedirectResponse(f"{FRONTEND_URL}/me?calendar=error")
 
 
 @app.get("/calendar/status")
