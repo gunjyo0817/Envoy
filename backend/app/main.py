@@ -19,11 +19,11 @@ from app.state import initial_state
 from app.sessions import register_ws, unregister_ws, broadcast, get_logs
 from app.auth import (
     init_db, signup, login, user_id_for_token, get_settings, update_settings, AuthError,
-    find_or_create_google_user, public_user_for_token,
+    find_or_create_google_user, public_user_for_token, set_onboarded,
 )
 from app.services import translate, identify_product, reverse_geocode, match_seeded_listing
 from app import store, gcal
-from app.telegram import notify_seller, notify_seller_time, notify_buyer, poll_updates
+from app.telegram import notify_seller, notify_seller_time, notify_buyer, poll_updates, mint_link_token
 
 app = FastAPI(title="Envoy API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
@@ -104,7 +104,11 @@ def _on_state_committed(session_id: str, state: dict) -> None:
         if last["role"] == "seller" and thread_len > last_notified_len:
             verb = {"accept": "accepted your offer", "counter_offer": "sent a counter-offer",
                     "reject": "declined"}.get(last["act"], "replied")
-            notify_buyer(session_id, f"Seller {verb} — review ▸")
+            notify_buyer(
+                session_id,
+                f"Seller {verb} — review ▸",
+                user_id=_sessions.get(session_id, {}).get("user_id"),
+            )
             if session_id in _sessions:
                 _sessions[session_id]["last_notified_len"] = thread_len
 
@@ -335,6 +339,23 @@ async def read_settings(user_id: int = Depends(_require_user)):
 @app.put("/settings")
 async def write_settings(req: SettingsRequest, user_id: int = Depends(_require_user)):
     return update_settings(user_id, req.language, req.default_address)
+
+
+@app.post("/onboarding/complete")
+async def complete_onboarding(user_id: int = Depends(_require_user)):
+    from app.auth import _public_user
+    set_onboarded(user_id)
+    return _public_user(user_id)
+
+
+@app.post("/telegram/link-token")
+async def telegram_link_token(user_id: int = Depends(_require_user)):
+    return mint_link_token(user_id)
+
+
+@app.get("/telegram/status")
+async def telegram_status(user_id: int = Depends(_require_user)):
+    return {"connected": store.chat_for_user(user_id) is not None}
 
 
 @app.get("/deals")

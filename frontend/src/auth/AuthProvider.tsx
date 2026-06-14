@@ -8,6 +8,7 @@ interface AuthValue {
   signup: (email: string, password: string, name: string) => Promise<void>
   loginWithToken: (token: string) => Promise<void>
   logout: () => void
+  refreshUser: () => Promise<void>
 }
 const AuthContext = createContext<AuthValue | null>(null)
 const KEY = 'envoy.auth'
@@ -25,6 +26,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthToken(tk)
     const u = await fetchMe()
     persist(tk, u)
+  }, [])
+
+  const refreshUser = useCallback(async () => {
+    const u = await fetchMe()
+    setUser(u)
+    const raw = localStorage.getItem(KEY)
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw)
+        localStorage.setItem(KEY, JSON.stringify({ ...parsed, user: u }))
+      } catch { /* ignore */ }
+    }
   }, [])
 
   // On mount: first honor a ?token= from the Google redirect, else restore from storage.
@@ -56,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null); setUser(null); setAuthToken(null); localStorage.removeItem(KEY)
   }, [])
 
-  return <AuthContext.Provider value={{ user, token, login, signup, loginWithToken, logout }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, token, login, signup, loginWithToken, logout, refreshUser }}>{children}</AuthContext.Provider>
 }
 
 export function useAuth(): AuthValue {

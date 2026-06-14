@@ -1,11 +1,28 @@
 """Telegram transport via raw httpx getUpdates long-polling. No external bot lib."""
-import os, asyncio, logging
+import os, asyncio, logging, secrets
 import httpx
 from app import store
 
 logger = logging.getLogger("envoy.telegram")
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "")
+# token -> user_id (in-memory; resets on restart, fine for the hackathon)
+_LINK_TOKENS: dict[str, int] = {}
+
+
+def mint_link_token(user_id: int) -> dict:
+    """Create a one-use-ish binding token and the Telegram deep link for it."""
+    token = secrets.token_urlsafe(16)
+    _LINK_TOKENS[token] = user_id
+    username = os.environ.get("TELEGRAM_BOT_USERNAME", BOT_USERNAME)
+    url = f"https://t.me/{username}?start={token}" if username else ""
+    return {"token": token, "url": url}
+
+
+def resolve_link_token(token: str) -> int | None:
+    return _LINK_TOKENS.get(token)
 
 
 def _api(method: str) -> str:
@@ -66,8 +83,10 @@ def notify_seller_time(session_id: str, pending: dict) -> None:
     tg_send(chat_id, text, buttons)
 
 
-def notify_buyer(session_id: str, message: str) -> None:
-    chat_id = store.chat_for_role("buyer")
+def notify_buyer(session_id: str, message: str, user_id: int | None = None) -> None:
+    chat_id = store.chat_for_user(user_id) if user_id is not None else None
+    if chat_id is None:
+        chat_id = store.chat_for_role("buyer")  # demo fallback
     if chat_id is None:
         return
     tg_send(chat_id, f"{message}\n\n{FRONTEND_URL}/?session={session_id}")
@@ -95,14 +114,20 @@ async def poll_updates(on_seller_reply) -> None:
 
 
 async def _dispatch(upd: dict, on_seller_reply) -> None:
-    # /start <role> registration
+    # /start <token-or-role> registration
     msg = upd.get("message")
     if msg and msg.get("text", "").startswith("/start"):
         chat_id = msg["chat"]["id"]
         parts = msg["text"].split()
-        role = parts[1] if len(parts) > 1 else "buyer"
-        store.register_chat(chat_id, role)
-        tg_send(chat_id, f"Registered as {role}. You'll get negotiation updates here.")
+        arg = parts[1] if len(parts) > 1 else "buyer"
+        user_id = resolve_link_token(arg)
+        if user_id is not None:
+            store.register_chat(chat_id, "buyer", user_id)
+            tg_send(chat_id, "✅ Connected! You'll get buyer updates here.")
+        else:
+            role = arg if arg in ("buyer", "seller") else "buyer"
+            store.register_chat(chat_id, role)
+            tg_send(chat_id, f"Registered as {role}. You'll get negotiation updates here.")
         return
     # inline button tap: "seller:accept" | "seller:counter" | "seller:reject" | "time:N"
     cb = upd.get("callback_query")

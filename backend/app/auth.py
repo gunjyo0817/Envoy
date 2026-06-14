@@ -22,9 +22,13 @@ def init_db() -> None:
                 pw_hash TEXT NOT NULL,
                 salt TEXT NOT NULL,
                 language TEXT NOT NULL DEFAULT 'en',
-                default_address TEXT NOT NULL DEFAULT ''
+                default_address TEXT NOT NULL DEFAULT '',
+                onboarded INTEGER NOT NULL DEFAULT 0
             )"""
         )
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "onboarded" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN onboarded INTEGER NOT NULL DEFAULT 0")
 
 
 def _hash(password: str, salt: str) -> str:
@@ -106,10 +110,14 @@ def user_id_for_token(token: str | None) -> int | None:
 def _public_user(user_id: int) -> dict:
     with _connect() as conn:
         row = conn.execute(
-            "SELECT id, email, name, language, default_address FROM users WHERE id = ?",
+            "SELECT id, email, name, language, default_address, onboarded FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
-    return dict(row) if row else {}
+    if not row:
+        return {}
+    u = dict(row)
+    u["onboarded"] = bool(u["onboarded"])
+    return u
 
 
 def get_settings(user_id: int) -> dict:
@@ -124,3 +132,8 @@ def update_settings(user_id: int, language: str | None, default_address: str | N
         if default_address is not None:
             conn.execute("UPDATE users SET default_address = ? WHERE id = ?", (default_address, user_id))
     return get_settings(user_id)
+
+
+def set_onboarded(user_id: int) -> None:
+    with _connect() as conn:
+        conn.execute("UPDATE users SET onboarded = 1 WHERE id = ?", (user_id,))
