@@ -5,7 +5,7 @@ cffi==2.0.0
 charset-normalizer==3.4.7
 click==8.4.1
 cryptography==49.0.0
-fastapi==0.115.14
+fastapi==0.137.0
 google-ai-generativelanguage==0.6.15
 google-api-core==2.31.0
 google-api-python-client==2.197.0
