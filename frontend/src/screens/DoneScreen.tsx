@@ -1,10 +1,9 @@
-import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { SessionState } from '../api'
-import AddToCalendar from '../components/AddToCalendar'
 
-export default function DoneScreen({ state }: { state: SessionState }) {
+export default function DoneScreen({ state, sessionId }: { state: SessionState; sessionId: string }) {
+  const navigate = useNavigate()
   const p = state.meetup_proposal
-  const [copied, setCopied] = useState(false)
 
   const agreed = p?.final_price ?? state.final_price
   const chosen = state.ranked_candidates?.[state.current_candidate_index ?? 0]
@@ -12,24 +11,6 @@ export default function DoneScreen({ state }: { state: SessionState }) {
     chosen?.price_eur != null && agreed != null && chosen.price_eur > agreed
       ? chosen.price_eur - agreed
       : null
-
-  const handleCopy = async () => {
-    const lines = [
-      'Envoy meetup',
-      chosen?.title && `Item: ${chosen.title}`,
-      p?.location && `Where: ${p.location}`,
-      p?.time_suggestion && `When: ${p.time_suggestion}`,
-      agreed != null && `Price agreed: €${agreed}`,
-      p?.buyer_route?.duration_text && `Travel: ${p.buyer_route.duration_text}`,
-    ].filter(Boolean) as string[]
-    try {
-      await navigator.clipboard.writeText(lines.join('\n'))
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      /* clipboard unavailable — no-op */
-    }
-  }
 
   const Detail = ({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value?: string; accent?: boolean }) =>
     value ? (
@@ -120,35 +101,19 @@ export default function DoneScreen({ state }: { state: SessionState }) {
         <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
           <button
             type="button"
-            onClick={() => (window.location.href = '/')}
+            onClick={() => navigate('/')}
             className="order-2 flex-1 cursor-pointer rounded-xl bg-[var(--color-primary)] py-3.5 text-sm font-semibold text-[var(--color-primary-text)] transition-[filter,transform] duration-150 hover:brightness-110 active:scale-[0.98] active:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] sm:order-1"
           >
             Start a new search
           </button>
           <button
             type="button"
-            onClick={handleCopy}
-            aria-live="polite"
+            onClick={() => navigate(`/history?session=${sessionId}`)}
             className="order-1 inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--color-surface-raised)] px-5 py-3.5 text-sm font-medium text-[var(--color-ink)] transition-[background-color,transform] duration-150 hover:bg-[var(--color-surface)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border)] sm:order-2"
           >
-            {copied ? (
-              <>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-                Copied
-              </>
-            ) : (
-              'Copy details'
-            )}
+            See detail
           </button>
         </div>
-
-        {(p?.location || chosen?.title) && (
-          <div className="mt-4">
-            <AddToCalendar summary={chosen?.title ? `Pick up ${chosen.title}` : 'Envoy meetup'} location={p?.location ?? ''} />
-          </div>
-        )}
       </div>
     </main>
   )

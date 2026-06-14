@@ -53,8 +53,8 @@ const PHASES: Record<string, Phase> = {
   },
   awaiting_seller: {
     title: 'Waiting for the seller to respond…',
-    sub: 'Your offer is with the seller. We’ll let you know the moment they reply.',
-    steps: ['Offer delivered', 'Waiting for the seller', 'Watching for a reply'],
+    sub: 'Your offer is with the seller. As soon as they reply, we’ll notify you on Telegram — you can safely leave this page and come back.',
+    steps: ['Offer delivered', 'Waiting for the seller', 'We’ll ping you on Telegram'],
     icon: (
       <svg {...ICON_PROPS} aria-hidden>
         <circle cx="12" cy="12" r="9" />
