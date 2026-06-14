@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { listDeals, getDeal, type Deal } from '../api'
 import NegotiationThread from '../components/NegotiationThread'
 import AddToCalendar from '../components/AddToCalendar'
@@ -40,9 +40,16 @@ export default function HistoryScreen() {
   const [deals, setDeals] = useState<Deal[] | null>(null)
   const [selected, setSelected] = useState<Deal | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [searchParams] = useSearchParams()
 
   useEffect(() => {
     listDeals().then(setDeals).catch(() => setError('Could not load history'))
+  }, [])
+
+  useEffect(() => {
+    const sid = searchParams.get('session')
+    if (sid) { getDeal(sid).then(setSelected).catch(() => {}) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const open = async (sessionId: string) => {

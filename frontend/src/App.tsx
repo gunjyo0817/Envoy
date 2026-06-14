@@ -37,7 +37,7 @@ function BuyerFlow() {
   if (status === 'negotiating' || status === 'coordinating') {
     return <ProcessingScreen status={status} />
   }
-  if (status === 'done') return <DoneScreen state={state} />
+  if (status === 'done') return <DoneScreen state={state} sessionId={sessionId!} />
   return <ProcessingScreen status={status} />
 }
 
