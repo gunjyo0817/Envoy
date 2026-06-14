@@ -44,6 +44,22 @@ const PLATFORM_LABEL: Record<string, string> = {
   facebook: 'Facebook',
 }
 
+// Real listings come from Tavily and carry a genuine URL. The generated/fallback
+// listings use placeholder paths (…/s-anzeige/generated, …/s-anzeige/gen-N) that
+// don't resolve — only surface a link for real ones.
+function realListingUrl(url?: string): string | null {
+  if (!url || !/^https?:\/\//.test(url) || url.includes('/s-anzeige/gen')) return null
+  return url
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </svg>
+  )
+}
+
 function StarIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -65,6 +81,7 @@ export default function ListingCard({ candidate, rank, variant, onClick, selecte
   const v = variant ?? (rank === 0 ? 'full' : 'compact')
   const condition = CONDITION_LABEL[candidate.condition] ?? candidate.condition
   const platform = PLATFORM_LABEL[candidate.platform] ?? candidate.platform
+  const listingUrl = realListingUrl(candidate.url)
   const clickable = !!onClick
   const ring = selected ? ' ring-2 ring-[var(--color-primary)]' : ''
   const interactive = clickable ? ` ${CLICKABLE}${ring}` : ''
@@ -87,6 +104,18 @@ export default function ListingCard({ candidate, rank, variant, onClick, selecte
         <span className="shrink-0 text-base font-bold tabular-nums text-[var(--color-ink)]">
           €{candidate.price_eur}
         </span>
+        {listingUrl && (
+          <a
+            href={listingUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Open this ${platform} listing`}
+            className="shrink-0 text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-primary)]"
+          >
+            <ExternalLinkIcon />
+          </a>
+        )}
       </article>
     )
   }
@@ -147,6 +176,19 @@ export default function ListingCard({ candidate, rank, variant, onClick, selecte
           </svg>
           {candidate.insight}
         </p>
+      )}
+
+      {listingUrl && (
+        <a
+          href={listingUrl}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] transition-colors hover:underline"
+        >
+          View on {platform}
+          <ExternalLinkIcon />
+        </a>
       )}
     </article>
   )

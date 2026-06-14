@@ -106,6 +106,8 @@ export interface Candidate {
   location: string
   platform: string
   insight?: string
+  url?: string
+  image_url?: string
 }
 
 export interface PendingDecision {
