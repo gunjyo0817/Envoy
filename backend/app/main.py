@@ -19,7 +19,7 @@ from app.state import initial_state
 from app.sessions import register_ws, unregister_ws, broadcast, get_logs
 from app.auth import (
     init_db, signup, login, user_id_for_token, get_settings, update_settings, AuthError,
-    find_or_create_google_user, public_user_for_token,
+    find_or_create_google_user, public_user_for_token, set_onboarded,
 )
 from app.services import translate, identify_product, reverse_geocode, match_seeded_listing
 from app import store, gcal
@@ -335,6 +335,13 @@ async def read_settings(user_id: int = Depends(_require_user)):
 @app.put("/settings")
 async def write_settings(req: SettingsRequest, user_id: int = Depends(_require_user)):
     return update_settings(user_id, req.language, req.default_address)
+
+
+@app.post("/onboarding/complete")
+async def complete_onboarding(user_id: int = Depends(_require_user)):
+    from app.auth import _public_user
+    set_onboarded(user_id)
+    return _public_user(user_id)
 
 
 @app.get("/deals")

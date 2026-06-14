@@ -23,3 +23,16 @@ def client(monkeypatch):
 def test_new_user_starts_not_onboarded(client):
     body = client.post("/auth/signup", json={"email": "a@b.com", "password": "pw"}).json()
     assert body["user"]["onboarded"] is False
+
+
+def test_complete_onboarding_flips_flag(client):
+    tok = client.post("/auth/signup", json={"email": "a@b.com", "password": "pw"}).json()["token"]
+    h = {"Authorization": f"Bearer {tok}"}
+    r = client.post("/onboarding/complete", headers=h)
+    assert r.status_code == 200
+    assert r.json()["onboarded"] is True
+    assert client.get("/auth/me", headers=h).json()["onboarded"] is True
+
+
+def test_complete_onboarding_requires_auth(client):
+    assert client.post("/onboarding/complete").status_code == 401
