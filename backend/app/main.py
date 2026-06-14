@@ -23,7 +23,7 @@ from app.auth import (
 )
 from app.services import translate, identify_product, reverse_geocode, match_seeded_listing
 from app import store, gcal
-from app.telegram import notify_seller, notify_seller_time, notify_buyer, poll_updates
+from app.telegram import notify_seller, notify_seller_time, notify_buyer, poll_updates, mint_link_token
 
 app = FastAPI(title="Envoy API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"],
@@ -342,6 +342,11 @@ async def complete_onboarding(user_id: int = Depends(_require_user)):
     from app.auth import _public_user
     set_onboarded(user_id)
     return _public_user(user_id)
+
+
+@app.post("/telegram/link-token")
+async def telegram_link_token(user_id: int = Depends(_require_user)):
+    return mint_link_token(user_id)
 
 
 @app.get("/deals")

@@ -1,11 +1,28 @@
 """Telegram transport via raw httpx getUpdates long-polling. No external bot lib."""
-import os, asyncio, logging
+import os, asyncio, logging, secrets
 import httpx
 from app import store
 
 logger = logging.getLogger("envoy.telegram")
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME", "")
+# token -> user_id (in-memory; resets on restart, fine for the hackathon)
+_LINK_TOKENS: dict[str, int] = {}
+
+
+def mint_link_token(user_id: int) -> dict:
+    """Create a one-use-ish binding token and the Telegram deep link for it."""
+    token = secrets.token_urlsafe(16)
+    _LINK_TOKENS[token] = user_id
+    username = os.environ.get("TELEGRAM_BOT_USERNAME", BOT_USERNAME)
+    url = f"https://t.me/{username}?start={token}" if username else ""
+    return {"token": token, "url": url}
+
+
+def resolve_link_token(token: str) -> int | None:
+    return _LINK_TOKENS.get(token)
 
 
 def _api(method: str) -> str:
