@@ -45,7 +45,7 @@ function OnboardingGate() {
   const { user } = useAuth()
   const navigate = useNavigate()
   useEffect(() => {
-    if (user && !user.onboarded) navigate('/onboarding', { replace: true })
+    if (user && user.onboarded === false) navigate('/onboarding', { replace: true })
   }, [user, navigate])
   return null
 }

@@ -108,7 +108,7 @@ export default function DoneScreen({ state, sessionId }: { state: SessionState; 
           </button>
           <button
             type="button"
-            onClick={() => navigate(`/history?session=${sessionId}`)}
+            onClick={() => navigate(`/deals?session=${sessionId}`)}
             className="order-1 inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--color-surface-raised)] px-5 py-3.5 text-sm font-medium text-[var(--color-ink)] transition-[background-color,transform] duration-150 hover:bg-[var(--color-surface)] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border)] sm:order-2"
           >
             See detail
