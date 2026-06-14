@@ -112,14 +112,20 @@ async def poll_updates(on_seller_reply) -> None:
 
 
 async def _dispatch(upd: dict, on_seller_reply) -> None:
-    # /start <role> registration
+    # /start <token-or-role> registration
     msg = upd.get("message")
     if msg and msg.get("text", "").startswith("/start"):
         chat_id = msg["chat"]["id"]
         parts = msg["text"].split()
-        role = parts[1] if len(parts) > 1 else "buyer"
-        store.register_chat(chat_id, role)
-        tg_send(chat_id, f"Registered as {role}. You'll get negotiation updates here.")
+        arg = parts[1] if len(parts) > 1 else "buyer"
+        user_id = resolve_link_token(arg)
+        if user_id is not None:
+            store.register_chat(chat_id, "buyer", user_id)
+            tg_send(chat_id, "✅ Connected! You'll get buyer updates here.")
+        else:
+            role = arg if arg in ("buyer", "seller") else "buyer"
+            store.register_chat(chat_id, role)
+            tg_send(chat_id, f"Registered as {role}. You'll get negotiation updates here.")
         return
     # inline button tap: "seller:accept" | "seller:counter" | "seller:reject" | "time:N"
     cb = upd.get("callback_query")
