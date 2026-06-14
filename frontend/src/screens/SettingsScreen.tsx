@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getSettings, updateSettings, calendarStatus, calendarAuthUrl } from '../api'
+import { getSettings, updateSettings, calendarStatus, calendarAuthUrl, telegramStatus, telegramLinkToken } from '../api'
 import { useI18n } from '../i18n/I18nProvider'
 import { useAuth } from '../auth/AuthProvider'
 import { LANGS, type Lang } from '../i18n/strings'
@@ -17,6 +17,7 @@ export default function SettingsScreen() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [calConnected, setCalConnected] = useState<boolean | null>(null)
+  const [tgConnected, setTgConnected] = useState<boolean | null>(null)
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // No session (logged out, or token invalidated by a backend restart) →
@@ -54,6 +55,11 @@ export default function SettingsScreen() {
   }, [user])
 
   useEffect(() => {
+    if (!user) return
+    telegramStatus().then((s) => setTgConnected(s.connected)).catch(() => setTgConnected(false))
+  }, [user])
+
+  useEffect(() => {
     return () => {
       if (savedTimer.current) clearTimeout(savedTimer.current)
     }
@@ -61,6 +67,11 @@ export default function SettingsScreen() {
 
   const connectCalendar = async () => {
     window.location.href = await calendarAuthUrl()
+  }
+
+  const connectTelegram = async () => {
+    const { url } = await telegramLinkToken()
+    if (url) window.open(url, '_blank', 'noopener')
   }
 
   const handleLangChange = (l: Lang) => {
@@ -102,20 +113,6 @@ export default function SettingsScreen() {
       />
 
       <div className="console-rise relative mx-auto flex min-h-[calc(100dvh-5rem)] w-full max-w-[34rem] flex-col">
-        {/* Header */}
-        <header className="flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="flex cursor-pointer items-center gap-1.5 text-sm font-medium text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M19 12H5M11 18l-6-6 6-6" />
-            </svg>
-            {t('common.back')}
-          </button>
-        </header>
-
         {/* Title */}
         <div className="mt-10">
           <h1 className="text-[2rem] font-bold leading-[1.1] tracking-[-0.02em] text-[var(--color-ink)]">
@@ -165,6 +162,22 @@ export default function SettingsScreen() {
                 onChange={(e) => setDefaultAddress(e.target.value)}
                 className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] py-3 px-4 text-base text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] transition-shadow duration-150 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               />
+            </div>
+
+            {/* Telegram */}
+            <div className="mt-7">
+              <p className="mb-2 block text-sm font-medium text-[var(--color-ink)]">Telegram</p>
+              {tgConnected ? (
+                <p className="text-sm text-[var(--color-primary)]">Connected — you'll get negotiation pings in Telegram.</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={connectTelegram}
+                  className="cursor-pointer rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-raised)] px-5 py-3 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
+                >
+                  Connect Telegram
+                </button>
+              )}
             </div>
 
             {/* Google Calendar */}

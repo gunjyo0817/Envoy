@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { listDeals, getDeal, type Deal } from '../api'
 import NegotiationThread from '../components/NegotiationThread'
 import AddToCalendar from '../components/AddToCalendar'
@@ -36,7 +36,6 @@ function BackButton({ label, onClick }: { label: string; onClick: () => void }) 
 }
 
 export default function HistoryScreen() {
-  const navigate = useNavigate()
   const [deals, setDeals] = useState<Deal[] | null>(null)
   const [selected, setSelected] = useState<Deal | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -105,9 +104,8 @@ export default function HistoryScreen() {
   return (
     <main className="min-h-dvh bg-[var(--color-bg)] px-5 py-10 text-[var(--color-ink)] sm:px-6">
       <div className="console-rise mx-auto w-full max-w-[34rem] lg:max-w-[40rem]">
-        <BackButton label="Home" onClick={() => navigate('/')} />
         <h1 className="text-balance text-2xl font-bold tracking-[-0.02em] text-[var(--color-ink)]">
-          History
+          Your deals
         </h1>
         <p className="mt-2 text-sm text-[var(--color-ink-muted)]">
           Past deals and the negotiations behind them.
